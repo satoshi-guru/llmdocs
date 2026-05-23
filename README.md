@@ -111,6 +111,80 @@ url: https://discord.com/developers/docs/interactions/application-commands
 
 ---
 
+## doc-prime — Claude Code Workflow
+
+llmdocs is the fetcher. The **doc-prime workflow** wraps it with two Claude Code skills
+that turn raw pages into ultra-compact references builders can consume in seconds.
+
+```
+/doc-prime expo supabase-js     ← fetch + compile + index in one command
+```
+
+Three steps, always in this order:
+
+```
+1. llmdocs.py    fetch docs → docs/<lib>/   (this tool)
+2. lib-context   compile → LIB-CONTEXT.md  (sprint-level API summary)
+3. doc-indexer   index   → docs/<lib>/COMPACT.md + docs/LOOKUP.md
+```
+
+### Why it matters
+
+| What Claude reads | Tokens |
+|-------------------|--------|
+| Raw docs folder (50 files) | ~40,000 |
+| `docs/<lib>/COMPACT.md` | ~800 |
+| `docs/LOOKUP.md` (all libs) | ~2,000 |
+
+**COMPACT.md = 98% token reduction. No more hallucinated API syntax.**
+
+### Install Claude Code skills
+
+```bash
+bash skills/install.sh
+```
+
+Copies three skills to `~/.claude/skills/`:
+
+| Skill | What it does |
+|-------|-------------|
+| `/doc-prime [lib1 lib2 ...]` | Full workflow: fetch → compile → index |
+| `/lib-context` | Compile `LIB-CONTEXT.md` from existing `docs/` |
+| `/doc-indexer [lib]` | Build `COMPACT.md` + `LOOKUP.md` for fast grep lookup |
+
+### Per-project setup
+
+After installing skills, add your project's library aliases to `doc-prime/SKILL.md`:
+
+```markdown
+| expo          | https://docs.expo.dev                                      |
+| supabase-js   | https://supabase.com/docs/reference/javascript/introduction |
+| react-native  | https://reactnative.dev/docs/getting-started               |
+```
+
+### Typical sprint workflow
+
+```bash
+# 1. Before coding — prime context
+/doc-prime expo supabase-js
+
+# 2. During sprint — instant lookup
+grep "getExpoPushToken" docs/LOOKUP.md
+
+# 3. If library upgraded — refresh
+/doc-prime expo --no-cache
+/doc-indexer expo
+```
+
+### Important: fetch timeout
+
+Doc fetches are network-bound and can take 2–5 minutes. In Claude Code:
+- Use `timeout: 300000` on the Bash tool call (5 min)
+- Do **not** run as background job — inline gives visible progress
+- Crawlers follow domain links — fetching one URL may capture the full docs site
+
+---
+
 ## License
 
 MIT
