@@ -60,7 +60,7 @@ PRESETS: dict[str, dict] = {
     "hyperliquid": {
         "name": "Hyperliquid Docs",
         "strategy": "http",
-        "url": "https://hyperliquid-dex.gitbook.io/hyperliquid-docs",
+        "url": "https://hyperliquid.gitbook.io/hyperliquid-docs",
         "out": "output/hyperliquid",
         "content_selectors": ["article", "main", ".page-body", "[class*='content']"],
         "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']",
@@ -70,6 +70,20 @@ PRESETS: dict[str, dict] = {
         "max_pages": 300,
         "same_domain_only": True,
         "rate_limit": 0.6,
+    },
+    # Hypedexer — HL data API (fills, analytics, vaults — no 2k cap, cursor pagination)
+    "hypedexer": {
+        "name": "Hypedexer API Docs",
+        "strategy": "http",
+        "url": "https://docs.hypedexer.com",
+        "out": "output/hypedexer",
+        "content_selectors": ["article", "main", ".page-body", "[class*='content']"],
+        "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']",
+                           "[class*='toc']", "[class*='navbar']"],
+        "max_depth": 5,
+        "max_pages": 150,
+        "same_domain_only": True,
+        "rate_limit": 0.5,
     },
     # OpenAI platform docs
     "openai": {
