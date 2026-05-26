@@ -27,9 +27,11 @@ import json
 import re
 import shutil
 import subprocess
+import threading
 import time
 import urllib.parse
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
@@ -40,6 +42,59 @@ try:
     _H2T_OK = True
 except ImportError:
     _H2T_OK = False
+
+
+# ---------------------------------------------------------------------------
+# URL skip patterns — prevent locale + version-mirror duplicate explosions
+# ---------------------------------------------------------------------------
+# Many doc sites expose the same content under multiple paths (locale variants,
+# historical version pins). Without these filters, an uncapped same-domain
+# crawl on e.g. git-scm.com fans out across thousands of near-duplicates:
+#   /docs/git-credential                ← canonical (kept)
+#   /docs/git-credential/fr             ← locale mirror (skipped)
+#   /docs/git-credential/zh_HANS-CN     ← locale mirror (skipped)
+#   /docs/git-credential/2.43.0         ← version mirror (skipped)
+# A site can override these by setting `skip_url_patterns: []` in its preset.
+
+# Locale + version-pinned patterns are always safe to skip.
+DEFAULT_SKIP_URL_PATTERNS = [
+    # Non-English locale segments anywhere in path.
+    # Whitelists /en/ (canonical for readthedocs and many other doc sites).
+    # Matches: /fr/, /de/, /pt_BR/, /zh_HANS-CN/, /de_DE/, etc.
+    r"/(?!en[/?#]|en$)[a-z]{2}(_[A-Z]{2,4}(-[A-Z]{2,4})?)?(/|$)",
+    # Version-pinned paths: /2.43.0/, /v6.2/, /1.0/, /v0.1.5/
+    r"/v?\d+\.\d+(\.\d+)?(/|$)",
+]
+
+# Version aliases that often mirror each other. We pick ONE as canonical
+# (detected from the start URL) and skip the rest. Defaults to /stable/ if
+# none appears in the start URL.
+_VERSION_ALIASES = ["stable", "latest", "main", "master", "dev", "develop", "next"]
+
+
+def _detect_canonical_version_slug(start_url: str) -> str | None:
+    """Return the version alias present in start URL, or None."""
+    path = urllib.parse.urlparse(start_url).path
+    for slug in _VERSION_ALIASES:
+        if f"/{slug}/" in path or path.rstrip("/").endswith(f"/{slug}"):
+            return slug
+    return None
+
+
+def _build_skip_patterns(start_url: str) -> list[re.Pattern]:
+    """Compile skip patterns for a given crawl, excluding the canonical slug."""
+    canonical = _detect_canonical_version_slug(start_url)
+    skip_aliases = [a for a in _VERSION_ALIASES if a != (canonical or "stable")]
+    patterns = list(DEFAULT_SKIP_URL_PATTERNS)
+    if skip_aliases:
+        patterns.append(rf"/({'|'.join(skip_aliases)})(/|$)")
+    return [re.compile(p) for p in patterns]
+
+
+def _url_is_skipped(url: str, patterns: list[re.Pattern]) -> bool:
+    """Return True if URL path matches any skip pattern."""
+    path = urllib.parse.urlparse(url).path
+    return any(p.search(path) for p in patterns)
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +193,9 @@ def _url_to_path(url: str, out_dir: Path) -> Path:
 def _links_from_soup(soup: BeautifulSoup, base_url: str, config: dict) -> list[str]:
     root = urllib.parse.urlparse(config["url"])
     prefix = config.get("path_prefix", "")
+    skip_patterns = config.get("_skip_patterns") or _build_skip_patterns(config["url"])
+    extra_skip = [re.compile(p) for p in config.get("extra_skip_patterns", [])]
+    all_patterns = skip_patterns + extra_skip
     seen: set[str] = set()
     out = []
     for a in soup.find_all("a", href=True):
@@ -150,6 +208,8 @@ def _links_from_soup(soup: BeautifulSoup, base_url: str, config: dict) -> list[s
         if config.get("same_domain_only") and parsed.netloc != root.netloc:
             continue
         if prefix and not parsed.path.startswith(prefix):
+            continue
+        if _url_is_skipped(full_no_frag, all_patterns):
             continue
         if full_no_frag not in seen:
             seen.add(full_no_frag)
@@ -192,6 +252,100 @@ def _clean_md(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+class _FetchThrottle:
+    """Shared rate-limit gate across worker threads.
+    Guarantees minimum `interval` seconds between any two HTTP fetches."""
+
+    def __init__(self, interval: float) -> None:
+        self.interval = interval
+        self._lock = threading.Lock()
+        self._next_at = 0.0
+
+    def wait(self) -> None:
+        if self.interval <= 0:
+            return
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next_at:
+                sleep_for = self._next_at - now
+            else:
+                sleep_for = 0.0
+            self._next_at = max(now, self._next_at) + self.interval
+        if sleep_for > 0:
+            time.sleep(sleep_for)
+
+
+def _fetch_and_extract(
+    url: str,
+    depth: int,
+    session: requests.Session,
+    raw_dir: Path,
+    out_dir: Path,
+    config: dict,
+    throttle: _FetchThrottle,
+    log_lock: threading.Lock,
+) -> tuple[dict | None, list[tuple[str, int]], dict | None]:
+    """Fetch one URL, extract markdown, return (page_or_None, next_links, error_or_None).
+    Thread-safe — no shared state mutated here beyond logging."""
+    cache_key = re.sub(r"[^\w]", "_", url)[:120]
+    cache_file = raw_dir / f"{cache_key}.html"
+
+    if cache_file.exists():
+        html = cache_file.read_text(encoding="utf-8", errors="replace")
+        with log_lock:
+            print(f"  cache  {url}")
+    else:
+        throttle.wait()
+        try:
+            r = session.get(url, timeout=20, allow_redirects=True)
+            if r.status_code != 200:
+                with log_lock:
+                    print(f"  skip-{r.status_code}  {url}")
+                return None, [], {"url": url, "status": r.status_code}
+            html = r.text
+            cache_file.write_text(html, encoding="utf-8")
+            with log_lock:
+                print(f"  fetch  {url}  ({len(html):,} bytes)")
+        except Exception as exc:
+            with log_lock:
+                print(f"  ERROR  {url}: {exc}")
+            return None, [], {"url": url, "error": str(exc)}
+
+    soup = BeautifulSoup(html, "lxml")
+
+    if len(soup.get_text(strip=True)) < 200:
+        with log_lock:
+            print(f"  thin-SPA  {url} — appears JS-rendered, skipping")
+        return None, [], {"url": url, "error": "SPA/JS-rendered, no static content"}
+
+    title_el = soup.find("h1") or soup.find("title")
+    title = title_el.get_text(strip=True).split("|")[0].strip() if title_el else "Untitled"
+
+    content_el = _extract_content(soup, config)
+    if not content_el:
+        return None, [], None
+
+    md = _clean_md(_html_to_md(content_el))
+    if len(md) < 80:
+        return None, [], None
+
+    page = {
+        "url": url,
+        "title": title,
+        "markdown": md,
+        "filepath": _url_to_path(url, out_dir),
+        "depth": depth,
+    }
+
+    next_links: list[tuple[str, int]] = []
+    max_depth = config.get("max_depth", 4)
+    if depth < max_depth:
+        for link in _links_from_soup(soup, url, config):
+            next_links.append((link, depth + 1))
+
+    return page, next_links, None
+
+
 def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     session = requests.Session()
     session.headers.update(DEFAULT_HEADERS)
@@ -200,75 +354,56 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     max_depth = config.get("max_depth", 4)
     max_pages = config.get("max_pages", 200)
     rate_limit = config.get("rate_limit", 0.5)
+    workers = max(1, int(config.get("workers", 1)))
     raw_dir = out_dir / "_raw_html"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
+    config["_skip_patterns"] = _build_skip_patterns(start_url)
+    canonical_slug = _detect_canonical_version_slug(start_url) or "stable (default)"
+
     visited: set[str] = set()
-    queue: deque[tuple[str, int]] = deque([(start_url, 0)])
     pages: dict[str, dict] = {}
     errors: list[dict] = []
+    throttle = _FetchThrottle(rate_limit)
+    log_lock = threading.Lock()
 
+    prefix_str = config.get("path_prefix") or "(none)"
     print(f"\n[Phase 1] HTTP crawl — {start_url}")
-    print(f"          depth={max_depth}  max_pages={max_pages}  rate={rate_limit}s\n")
+    print(f"          depth={max_depth}  max_pages={max_pages}  "
+          f"rate={rate_limit}s  workers={workers}")
+    print(f"          path_prefix: {prefix_str}")
+    print(f"          canonical version slug: {canonical_slug}\n")
 
-    while queue and len(visited) < max_pages:
-        url, depth = queue.popleft()
-        if url in visited:
-            continue
-        visited.add(url)
+    current_wave: list[tuple[str, int]] = [(start_url, 0)]
+    visited.add(start_url)
 
-        cache_key = re.sub(r"[^\w]", "_", url)[:120]
-        cache_file = raw_dir / f"{cache_key}.html"
+    while current_wave and len(visited) < max_pages:
+        next_wave_seen: set[str] = set()
+        next_wave: list[tuple[str, int]] = []
 
-        if cache_file.exists():
-            html = cache_file.read_text(encoding="utf-8", errors="replace")
-            print(f"  cache  {url}")
-        else:
-            try:
-                r = session.get(url, timeout=20, allow_redirects=True)
-                if r.status_code != 200:
-                    print(f"  skip-{r.status_code}  {url}")
-                    errors.append({"url": url, "status": r.status_code})
-                    continue
-                html = r.text
-                cache_file.write_text(html, encoding="utf-8")
-                print(f"  fetch  {url}  ({len(html):,} bytes)")
-                time.sleep(rate_limit)
-            except Exception as exc:
-                print(f"  ERROR  {url}: {exc}")
-                errors.append({"url": url, "error": str(exc)})
-                continue
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futures = [
+                ex.submit(_fetch_and_extract, url, depth, session,
+                          raw_dir, out_dir, config, throttle, log_lock)
+                for url, depth in current_wave
+            ]
+            for fut in as_completed(futures):
+                page, links, err = fut.result()
+                if page is not None:
+                    pages[page["url"]] = page
+                if err is not None:
+                    errors.append(err)
+                for link, link_depth in links:
+                    if link in visited or link in next_wave_seen:
+                        continue
+                    if len(visited) + len(next_wave) >= max_pages:
+                        break
+                    next_wave_seen.add(link)
+                    next_wave.append((link, link_depth))
 
-        soup = BeautifulSoup(html, "lxml")
-
-        # Thin body = JS-rendered SPA, skip
-        if len(soup.get_text(strip=True)) < 200:
-            print(f"  thin-SPA  {url} — appears JS-rendered, skipping")
-            errors.append({"url": url, "error": "SPA/JS-rendered, no static content"})
-            continue
-
-        title_el = soup.find("h1") or soup.find("title")
-        title = title_el.get_text(strip=True).split("|")[0].strip() if title_el else "Untitled"
-
-        content_el = _extract_content(soup, config)
-        if not content_el:
-            continue
-
-        md = _clean_md(_html_to_md(content_el))
-        if len(md) < 80:
-            continue
-
-        pages[url] = {
-            "title": title,
-            "markdown": md,
-            "filepath": _url_to_path(url, out_dir),
-            "depth": depth,
-        }
-
-        if depth < max_depth:
-            for link in _links_from_soup(soup, url, config):
-                if link not in visited:
-                    queue.append((link, depth + 1))
+        for link, _ in next_wave:
+            visited.add(link)
+        current_wave = next_wave
 
     print(f"\n[Phase 1] Done — {len(pages)} pages, {len(errors)} errors")
     return pages, errors
@@ -438,6 +573,13 @@ def run(config: dict) -> int:
         err_file.write_text(json.dumps(errors, indent=2))
         print(f"[Errors] {len(errors)} logged → {err_file}")
 
+    if not config.get("keep_html", False):
+        for sub in ("_raw_html", "_github_clone"):
+            d = out_dir / sub
+            if d.exists():
+                shutil.rmtree(d)
+                print(f"[cleanup] removed {d.name}/ (use --keep-html to retain)")
+
     print(f"\n{'='*60}")
     print(f"  Done — {len(pages)} pages → {out_dir.resolve()}")
     print(f"{'='*60}\n")
@@ -464,8 +606,16 @@ def main() -> int:
                         help="Subdirectory in repo containing docs (default: docs)")
     parser.add_argument("--max-depth", type=int, help="HTTP crawl depth override")
     parser.add_argument("--max-pages", type=int, help="HTTP crawl page limit override")
+    parser.add_argument("--path-prefix", default=None,
+                        help="Restrict crawl to URLs under this path (auto-derived from start URL's first segment; pass '' to disable)")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Concurrent fetches per BFS wave (default 1; try 4 for batch refresh)")
+    parser.add_argument("--rate-limit", type=float, default=None, dest="rate_limit",
+                        help="Seconds between fetches across all workers (default 0.5; polite floor ~0.1)")
     parser.add_argument("--no-cache", action="store_true",
                         help="Clear cached HTML/clone before running")
+    parser.add_argument("--keep-html", action="store_true",
+                        help="Keep _raw_html/ cache after successful run (default: deleted to save disk)")
     parser.add_argument("--list-presets", action="store_true",
                         help="List available presets and exit")
     args = parser.parse_args()
@@ -481,7 +631,25 @@ def main() -> int:
     if args.preset:
         config = PRESETS[args.preset].copy()
     elif args.url:
-        domain = urllib.parse.urlparse(args.url).netloc
+        parsed_start = urllib.parse.urlparse(args.url)
+        domain = parsed_start.netloc
+        # Auto-derive path_prefix from the first path segment so the crawler
+        # stays inside /docs/, /reference/, /ruff/, etc. and doesn't bleed
+        # into /blog/, /customers/, /partners/ on shared-domain sites.
+        # User can override with --path-prefix or "" to disable.
+        if args.path_prefix is not None:
+            path_prefix = args.path_prefix
+        else:
+            # File-like start URLs (e.g. /docs.html) have no canonical sub-tree
+            # so we don't auto-restrict. Directory-like URLs get prefix = first segment.
+            start_path = parsed_start.path
+            is_file = bool(re.search(r"\.(html?|php|md|txt)$", start_path, re.IGNORECASE))
+            first_segment = start_path.lstrip("/").split("/", 1)[0]
+            if is_file or not first_segment or "." in first_segment:
+                path_prefix = ""
+            else:
+                path_prefix = f"/{first_segment}/"
+
         config = {
             "name": domain,
             "strategy": args.strategy,
@@ -490,9 +658,11 @@ def main() -> int:
             "content_selectors": ["main", "article", "#content", "[class*='content']"],
             "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']"],
             "max_depth": args.max_depth or 4,
-            "max_pages": args.max_pages or 200,
+            "max_pages": args.max_pages or 5000,
             "same_domain_only": True,
-            "rate_limit": 0.5,
+            "path_prefix": path_prefix,
+            "rate_limit": args.rate_limit if args.rate_limit is not None else 0.5,
+            "workers": args.workers,
         }
         if args.strategy == "github":
             if not args.github_repo:
@@ -508,6 +678,10 @@ def main() -> int:
         config["max_depth"] = args.max_depth
     if args.max_pages:
         config["max_pages"] = args.max_pages
+    if args.rate_limit is not None:
+        config["rate_limit"] = args.rate_limit
+    if args.workers and args.workers != 1:
+        config["workers"] = args.workers
 
     if args.no_cache:
         for sub in ("_raw_html", "_github_clone"):
@@ -516,6 +690,7 @@ def main() -> int:
                 shutil.rmtree(d)
                 print(f"[cache] cleared {d}")
 
+    config["keep_html"] = args.keep_html
     return run(config)
 
 
