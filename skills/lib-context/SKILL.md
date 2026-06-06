@@ -15,7 +15,9 @@ Before reading any raw docs, check if `/doc-indexer` has already processed them:
 
 ```bash
 ls ~/.llmdocs/docs/*/COMPACT.md 2>/dev/null
-cat ~/.llmdocs/docs/LOOKUP.md 2>/dev/null | head -5
+test -s ~/.llmdocs/docs/LOOKUP.md \
+  && echo "LOOKUP.md present ($(wc -l < ~/.llmdocs/docs/LOOKUP.md) lines)" \
+  || echo "LOOKUP.md absent or empty"
 ```
 
 **If `~/.llmdocs/docs/<lib>/COMPACT.md` exists → read ONLY that file for this library. Skip Step 2 for it.**

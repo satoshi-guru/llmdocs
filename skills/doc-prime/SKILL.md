@@ -53,9 +53,19 @@ Index **before** compiling — the indexer produces the `COMPACT.md` + `LOOKUP.m
 auto-chains `/doc-indexer` after a successful fetch), so only index slugs that still lack a
 `COMPACT.md` (e.g. libs already in the store from an older fetch):
 
+Set `FETCHED_SLUGS` to the space-separated list of slugs successfully fetched in Step 1
+(e.g. `FETCHED_SLUGS="expo supabase-js"`). If Step 1 was skipped (no arguments), set `FETCHED_SLUGS=""`.
+
 ```bash
-# Which store libs are missing a COMPACT.md?
-for d in ~/.llmdocs/docs/*/; do [ -f "$d/COMPACT.md" ] || echo "needs index: $(basename "$d")"; done
+# Which store libs (from prior sessions) are missing a COMPACT.md?
+# Exclude libs fetched in Step 1 — /llmdoc already ran doc-indexer for those.
+# FETCHED_SLUGS should be set to the space-separated list of slugs from Step 1.
+for d in ~/.llmdocs/docs/*/; do
+  slug=$(basename "$d")
+  # Skip if this slug was fetched in the current run (already indexed by /llmdoc)
+  case " $FETCHED_SLUGS " in *" $slug "*) continue ;; esac
+  [ -f "$d/COMPACT.md" ] || echo "needs index: $slug"
+done
 ```
 
 For any that need it, **follow the `doc-indexer` skill instructions** (it reads
@@ -71,8 +81,11 @@ compact tier produced in Step 2 (fast path), falling back to raw docs only when 
 `COMPACT.md`:
 
 ```bash
-# COMPACT.md fast-path should now exist for every fetched lib
-ls ~/.llmdocs/docs/*/COMPACT.md 2>/dev/null
+# COMPACT.md fast-path should exist for the libs in this run
+for slug in $FETCHED_SLUGS; do
+  f="$HOME/.llmdocs/docs/$slug/COMPACT.md"
+  test -f "$f" && echo "OK: $f" || echo "MISSING: $f — doc-indexer may have failed"
+done
 ```
 
 Then follow the lib-context skill instructions fully to produce `LIB-CONTEXT.md`.
