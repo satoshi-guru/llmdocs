@@ -119,7 +119,10 @@ def _run_judge(artifact: str, qa: list[dict]) -> float | None:
 
 def bench_lib(lib: str, store: Path) -> dict:
     lib_dir = store / lib
-    golden = json.loads((GOLDENS / f"{lib}.json").read_text(encoding="utf-8"))
+    golden_path = GOLDENS / f"{lib}.json"
+    if not golden_path.exists():
+        raise SystemExit(f"no golden for '{lib}' — add bench/goldens/{lib}.json first")
+    golden = json.loads(golden_path.read_text(encoding="utf-8"))
     must_have = golden["must_have"]
     qa = golden.get("qa", [])
     lookup_lines = golden.get("lookup", [])
@@ -137,7 +140,7 @@ def bench_lib(lib: str, store: Path) -> dict:
             "strategy": sname,
             "tokens": toks,
             "reduction": 1 - (toks / full_raw),
-            "recall": (len(must_have) - len(missing)) / len(must_have),
+            "recall": (len(must_have) - len(missing)) / len(must_have) if must_have else 1.0,
             "missing": missing,
             "gate": "PASS" if not missing else "FAIL",
             "judge": _run_judge(art, qa),
