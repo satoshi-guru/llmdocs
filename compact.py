@@ -12,7 +12,7 @@ Two staged levels (each builds on the previous):
           best-effort round-trips back to readable Markdown.
 
 CRITICAL: every transform skips fenced code blocks (``` / ~~~). Code samples pass
-through verbatim. This is the bug the original hl_* markdown_compiler had.
+through verbatim. This is the most common silent bug in ad-hoc Markdown compressors.
 
 Relationship to the LLM tier: this is *mechanical* compression (complete, ~30-55%);
 `COMPACT.md` (from /doc-indexer) is *semantic* LLM distillation (~99%, lossy). They

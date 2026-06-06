@@ -1,6 +1,6 @@
 ---
 name: llmdoc
-description: Fetch the docs for a specific library, framework, or URL and save them as LLM-ready markdown in the GLOBAL store (~/.llmdocs/docs/<slug>/), shared by every repo. Use whenever the user wants to grab, pull, mirror, save, or refresh docs for a named library/API — e.g. "grab the supabase-js docs", "fetch the discord developer docs", "pull httpx before I refactor". Always use BEFORE writing config or code against an unfamiliar or recently-changed library API, and immediately when a first install/build/run attempt fails — don't guess or retry with workarounds first. Routes engine presets (Discord SPA, Hyperliquid, etc.) via --preset. This is the quick single-library/single-URL fetch; for full pre-sprint prep across several libraries use /doc-prime. Reading docs already in the store is a plain file read, not this.
+description: Fetch the docs for a specific library, framework, or URL and save them as LLM-ready markdown in the GLOBAL store (~/.llmdocs/docs/<slug>/), shared by every repo. Use whenever the user wants to grab, pull, mirror, save, or refresh docs for a named library/API — e.g. "grab the supabase-js docs", "fetch the discord developer docs", "pull httpx before I refactor". Always use BEFORE writing config or code against an unfamiliar or recently-changed library API, and immediately when a first install/build/run attempt fails — don't guess or retry with workarounds first. Routes engine presets (Discord SPA, Hyperliquid, etc.) via --preset. This is the quick single-library/single-URL fetch; for full pre-sprint prep across several libraries use /doc-prime.
 argument-hint: "[alias | <url>] — see presets table below"
 allowed-tools: Bash Read WebFetch WebSearch
 ---
@@ -11,6 +11,8 @@ are available to **every** repo — never siloed per project. Versions never mat
 new fetches **add** to the store, they never replace what's already there.
 
 Arguments: $ARGUMENTS
+
+**Note:** Reading docs already in the store is a plain file read (use the `Read` tool directly on `~/.llmdocs/docs/<lib>/`), not a fetch. Use this skill only when you need to pull new or refreshed docs from the network.
 
 ## Common presets
 
@@ -72,7 +74,7 @@ Arguments: $ARGUMENTS
 | Alias | Fetches |
 |-------|---------|
 | hyperliquid | **engine preset** → `--preset hyperliquid` (tuned GitBook selectors + path prefix) |
-| example-site | **engine preset** → `--preset example-site` (HL data API — fills, analytics, vaults) |
+| example-site | **engine preset** → `--preset example-site` (third-party Hyperliquid analytics — fills, trades, vault data) |
 | ethers | https://docs.ethers.org/v6/ |
 | viem | https://viem.sh/docs/getting-started |
 

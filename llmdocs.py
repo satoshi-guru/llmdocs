@@ -145,7 +145,7 @@ PRESETS: dict[str, dict] = {
         "same_domain_only": True,
         "rate_limit": 0.6,
     },
-    # Hypedexer — HL data API (fills, analytics, vaults — no 2k cap, cursor pagination)
+    # Hypedexer — third-party Hyperliquid analytics API (fills, trades, vault data)
     "example-site": {
         "name": "Hypedexer API Docs",
         "strategy": "http",

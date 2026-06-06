@@ -39,6 +39,22 @@ python llmdocs.py --preset hyperliquid
 
 ---
 
+## example-site
+
+| Field | Value |
+|-------|-------|
+| Strategy | HTTP crawl |
+| Source | docs.example-site.com |
+| Coverage | Fills, trades, vault analytics — Hyperliquid data API |
+
+Third-party analytics API for Hyperliquid on-chain data. HTTP crawl (server-side rendered).
+
+```bash
+python llmdocs.py --preset example-site
+```
+
+---
+
 ## openai
 
 | Field | Value |

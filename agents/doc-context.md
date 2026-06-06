@@ -64,19 +64,15 @@ Do NOT paraphrase. Copy exact syntax from the docs. The value is precision, not 
 
 When a library has many doc files, read in this order and stop when you have enough context:
 
-| Library | Read first | Skip |
-|---------|-----------|------|
-| pnpm | workspace_yaml, settings | translations (es/, fr/, zh/, etc.) |
-| prisma | schema, queries, relations | deployment, studio, data platform |
-| trpc | router, procedures, context, middleware | adapters not in use |
-| nextauth / authjs | configuration, session, middleware | providers not in use |
-| nativewind | getting-started, styling, configuration | v2/v3 migration guides |
-| expo / expo-router | routing, layouts, navigation | api routes if not used |
-| tailwind | core concepts, utilities used | plugins not in use |
-| zod | primitives, transforms, validation | rarely-used schema types |
-| vitest | configuration, test api | browser mode if not used |
+For each library, read in this order and stop when you have enough context:
 
-For unlisted libraries: read the INDEX.md or README first, then the core API reference.
+1. `INDEX.md` or `README.md` — get a map of the surface area first
+2. Core API reference files (look for filenames matching: `api`, `reference`, `client`, `schema`, `config`, `routes`, `queries`)
+3. Getting-started or quickstart file — for real working examples
+
+Skip unless the task specifically requires them: translation directories (`de/`, `ja/`, `zh/`, `fr/`, etc.), changelogs, contributing guides, deployment guides for services not in use, and migration guides for versions you are not migrating to.
+
+The goal is the exact function signatures and version-specific warnings the builder needs — not a comprehensive read.
 
 ## Output
 
@@ -86,7 +82,7 @@ After writing, report to orchestrator:
 ```
 LIB-CONTEXT.md written to {SPRINT_DIR}/LIB-CONTEXT.md
 Libraries covered: {list}
-Missing (used embedded fallback): {list or "none"}
+Missing (not in store — no patterns emitted, model memory only): {list or "none"}
 Fetch to improve: /llmdoc {library} for each missing
 ```
 
@@ -94,5 +90,7 @@ Fetch to improve: /llmdoc {library} for each missing
 
 - Do not write application code
 - Do not modify any source files
-- Do not run build commands (pnpm, prisma, webpack, etc.)
-- Do not fetch from the network — read only from the global doc store `$LLMDOCS_HOME/docs/` (default `~/.llmdocs/docs/`, symlinked at `~/.claude/docs/`)
+- Do not run build commands (package managers, bundlers, database tools, etc.)
+- Do not fetch from the network — read only from the global doc store `$LLMDOCS_HOME/docs/` (default `~/.llmdocs/docs/`)
+
+If a library is not in the store, emit only the missing-docs notice below — do **not** fall back to training-data memory for API signatures; the risk of hallucinating a deprecated or wrong call is exactly what this agent exists to prevent.
