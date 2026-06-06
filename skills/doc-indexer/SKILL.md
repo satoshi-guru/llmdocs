@@ -11,7 +11,7 @@ knowledge is ever removed — new findings are additive.
 
 Reads `~/.llmdocs/docs/<lib>/` folders and produces two artifacts:
 
-1. **`~/.llmdocs/docs/<lib>/COMPACT.md`** — ~80-line dense reference per library:
+1. **`~/.llmdocs/docs/<lib>/COMPACT.md`** — up to 120-line dense reference per library (target 80–120 lines):
    function signatures, key patterns, breaking changes, gotchas. Replaces reading 50+ raw pages.
 
 2. **`~/.llmdocs/docs/LOOKUP.md`** — global single-file grep table across all indexed libs:
@@ -119,7 +119,10 @@ Write to `~/.llmdocs/docs/<lib>/COMPACT.md`:
 <bullet list of anti-patterns from docs>
 ```
 
-Hard limit: **120 lines**. Cut lower-priority items if over limit.
+Size guideline: **80–120 lines, hard cap 120**. COMPACT.md is a navigable *summary* tier — the
+cap is a size guideline, not permission to silently drop answer-relevant content. If patterns
+don't fit, prefer tighter phrasing over omission. The full content remains reachable via the
+`.min.md` pages and `LOOKUP.md` — COMPACT is the fast path, not the only path.
 Every line must be a direct quote or paraphrase from the actual docs — no invention.
 
 ### Step 4 — Update LOOKUP.md (global grep tier)

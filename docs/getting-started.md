@@ -60,9 +60,17 @@ url: https://discord.com/developers/docs/interactions/application-commands
 
 ## Re-running
 
-Runs are resumable. Raw HTML is cached in `~/.llmdocs/docs/<name>/_raw_html/` during the run. Re-running the same command skips already-fetched pages.
+During a crawl, raw HTML is cached in `_raw_html/` so **interrupted runs can resume**
+without re-fetching pages already downloaded. The cache is deleted after a successful
+run to save disk space.
 
-To force a full re-fetch:
+To retain the cache for faster re-runs:
+
+```bash
+python llmdocs.py --preset discord --keep-html
+```
+
+To force a full re-fetch (ignoring any cached files):
 
 ```bash
 python llmdocs.py --preset discord --no-cache

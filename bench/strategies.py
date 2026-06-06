@@ -16,8 +16,9 @@ from pathlib import Path
 # Files in a lib dir that are NOT raw doc pages (mirror scripts.manifest.SKIP_FILES).
 _NON_RAW = {"COMPACT.md", "INDEX.md", "LOOKUP.md"}
 
-# Char budget for the raw-docs baseline. ~12k chars ≈ ~3k tokens — a realistic
-# "read the top few pages" slice; full raw would be 10–100× larger.
+# Hard char budget for the raw-docs baseline. ~12k chars ≈ ~3k tokens — a realistic
+# "skim the top pages" slice enforced on the combined output (not per-page).
+# Full raw would be 10–100× larger for real libraries; this is the bounded baseline.
 RAW_HEAD_BUDGET = 12_000
 
 
@@ -29,20 +30,23 @@ def _raw_pages(lib_dir: Path) -> list[Path]:
 
 
 def s_raw_head(lib_dir: Path, lookup_lines: list[str]) -> str:
-    """Baseline: concatenate the largest raw pages up to RAW_HEAD_BUDGET chars.
+    """Baseline: first RAW_HEAD_BUDGET chars of the largest raw pages.
 
-    Simulates 'just read the docs' without any compaction — high quality, high cost.
+    Simulates a realistic 'skim the top pages' read — high cost but bounded.
+    RAW_HEAD_BUDGET is enforced on the *combined* output, so even a single large page
+    is truncated. This makes the baseline ~3k tokens as documented and comparable to
+    the compact tier. For full raw-page reading, use the raw page files directly.
     """
     out, used = [], 0
     for p in _raw_pages(lib_dir):
-        text = p.read_text(encoding="utf-8", errors="ignore")
-        if used + len(text) > RAW_HEAD_BUDGET and out:
-            break
-        out.append(text)
-        used += len(text)
         if used >= RAW_HEAD_BUDGET:
             break
-    return "\n\n".join(out)
+        text = p.read_text(encoding="utf-8", errors="ignore")
+        remaining = RAW_HEAD_BUDGET - used
+        out.append(text[:remaining])
+        used += min(len(text), remaining)
+    combined = "\n\n".join(out)
+    return combined[:RAW_HEAD_BUDGET]
 
 
 def s_compact(lib_dir: Path, lookup_lines: list[str]) -> str:

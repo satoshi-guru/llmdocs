@@ -40,6 +40,12 @@ python llmdocs.py \
   --out output/example
 ```
 
+> **Why `--url` is required:** `--url` is the CLI's entry point for all non-preset runs.
+> When using `--strategy github`, the `--url` value is not fetched — `phase1_github()`
+> reads directly from the cloned repo. However `--url` determines the output slug
+> (the directory name under `~/.llmdocs/docs/`). Pass the canonical library website URL
+> or add `--out ~/.llmdocs/docs/<slug>/` explicitly to control the slug.
+
 **Works well for:**
 - React/SPA sites where the underlying docs are open source (Discord, Stripe, GitHub)
 - Faster and more reliable than crawling

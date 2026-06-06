@@ -181,7 +181,7 @@ llmdocs is the fetcher. The **doc-prime workflow** wraps it with Claude Code ski
 that turn raw pages into ultra-compact references builders can consume in seconds.
 
 ```
-/doc-prime expo supabase-js     ← fetch + compile + index in one command
+/doc-prime expo supabase-js     ← fetch + index + compile in one command
 ```
 
 Always in this order — **index before compile**, because `lib-context` *consumes* `COMPACT.md`:
@@ -262,7 +262,7 @@ four skills to `~/.claude/skills/`:
 | Skill | What it does |
 |-------|-------------|
 | `/llmdoc [lib \| url]` | Fetch docs into the global store |
-| `/doc-prime [lib1 lib2 ...]` | Full workflow: fetch → compile → index |
+| `/doc-prime [lib1 lib2 ...]` | Full workflow: fetch → index → compile |
 | `/lib-context` | Compile `LIB-CONTEXT.md` from the store |
 | `/doc-indexer [lib]` | Build `COMPACT.md` + `LOOKUP.md` for fast grep lookup |
 
