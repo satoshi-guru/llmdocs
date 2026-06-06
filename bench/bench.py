@@ -251,6 +251,20 @@ def main() -> int:
             print(f"  {row['strategy']:<15} {row['tokens']:>6,} tok  "
                   f"{row['reduction']*100:6.2f}% reduction  recall {row['recall']*100:3.0f}%  "
                   f"{row['gate']}  judge={_fmt_judge(row['judge'])}")
+    # Deterministic CI gate: any tracked strategy that dropped a must_have signature fails
+    # the run. raw_head is the negative control — it is *allowed* to FAIL in the report
+    # (it reads only a budget slice of raw pages, not the compacted artifacts), so it is
+    # excluded from the gate. Only the curated compaction strategies are gated.
+    gate_failed = any(
+        row["gate"] == "FAIL"
+        for r in results
+        for row in r["rows"]
+        if row["strategy"] != "raw_head"
+    )
+    if gate_failed:
+        print("RECALL GATE FAILED: a strategy dropped a must_have signature "
+              "(see the FAIL rows above / in the report)", file=sys.stderr)
+        return 1
     return 0
 
 
