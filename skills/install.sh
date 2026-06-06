@@ -9,6 +9,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 STORE_HOME="${LLMDOCS_HOME:-$HOME/.llmdocs}"
 
+# Preflight: python3 must be on PATH and the engine must be runnable.
+command -v python3 >/dev/null 2>&1 || {
+  echo "ERROR: python3 not found on PATH. Install Python 3.10+ first." >&2
+  exit 1
+}
+python3 "$REPO_DIR/llmdocs.py" --help >/dev/null 2>&1 || {
+  echo "ERROR: llmdocs.py not runnable at $REPO_DIR. Check your clone or Python install." >&2
+  exit 1
+}
+
 # 1. Global append-only doc store — shared by every repo, never per-project.
 echo "Setting up global doc store at $STORE_HOME/docs ..."
 mkdir -p "$STORE_HOME/docs"
@@ -26,6 +36,10 @@ echo "Installing llmdocs Claude Code skills to $SKILLS_DIR..."
 for skill in llmdoc doc-prime lib-context doc-indexer; do
   mkdir -p "$SKILLS_DIR/$skill"
   # copy SKILL.md + any sibling files (e.g. llmdoc/PRESETS.md)
+  if ! ls "$SCRIPT_DIR/$skill"/*.md >/dev/null 2>&1; then
+    echo "  ⚠ $skill: no .md files found in $SCRIPT_DIR/$skill — skipping" >&2
+    continue
+  fi
   cp "$SCRIPT_DIR/$skill"/*.md "$SKILLS_DIR/$skill/"
   echo "  ✓ $skill"
 done
@@ -40,7 +54,9 @@ fi
 
 # 4. Manifest (index of everything gathered so far).
 if [ -f "$REPO_DIR/scripts/manifest.py" ]; then
-  (cd "$REPO_DIR" && python3 -m scripts.manifest) >/dev/null 2>&1 || true
+  if ! (cd "$REPO_DIR" && python3 -m scripts.manifest) >/dev/null 2>&1; then
+    echo "  ⚠ manifest rebuild failed (non-fatal — run: cd $REPO_DIR && python3 -m scripts.manifest)" >&2
+  fi
 fi
 
 echo ""
@@ -59,7 +75,18 @@ echo ""
 echo "Store: $STORE_HOME/docs   ·   manifest: $STORE_HOME/MANIFEST.md"
 echo "Override the store location anywhere with \$LLMDOCS_HOME."
 echo ""
-echo "IMPORTANT — the skills locate the engine via \$LLMDOCS_DIR. Add this to your"
-echo "shell profile (~/.bashrc, ~/.zshrc) so every Claude Code session sees it:"
+# Persist LLMDOCS_DIR into the user's shell profile (idempotent).
+PROFILE="${HOME}/.bashrc"
+[ -n "${ZSH_VERSION:-}" ] && PROFILE="${HOME}/.zshrc"
+LLMDOCS_DIR_LINE="export LLMDOCS_DIR=\"${REPO_DIR}\""
+if grep -qF "$LLMDOCS_DIR_LINE" "$PROFILE" 2>/dev/null; then
+  echo "  • LLMDOCS_DIR already set in $PROFILE — no change"
+else
+  printf '\n# llmdocs engine path (added by install.sh)\n%s\n' "$LLMDOCS_DIR_LINE" >> "$PROFILE"
+  echo "  ✓ Added LLMDOCS_DIR to $PROFILE"
+fi
 echo ""
-echo "    export LLMDOCS_DIR=\"$REPO_DIR\""
+echo "Run: source $PROFILE   (or open a new shell) so the variable is live."
+echo ""
+echo "Note: fish users must manually add: set -x LLMDOCS_DIR $REPO_DIR"
+echo "  to ~/.config/fish/config.fish"
