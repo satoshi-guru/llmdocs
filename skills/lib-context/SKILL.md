@@ -86,15 +86,20 @@ Do NOT paraphrase. Copy exact syntax. Paraphrasing introduces hallucination.
 
 ---
 
-## Step 3: Check Project CLAUDE.md for Project-Specific Conventions
+## Step 3: Check Project CLAUDE.md for Project-Specific Conventions (conditional)
 
-Before writing the output, read the project's `CLAUDE.md` and extract:
+**Only if `CLAUDE.md` exists in the current working directory** (`test -f CLAUDE.md`), read it
+and extract:
 - Custom procedure names or middleware wrappers (e.g., `vaultProcedure`, `protectedProcedure`)
 - Project-specific error constant names (e.g., `AppErrors`, `ProjectErrors`)
 - Hard security invariants builders must respect
 - Naming conventions that differ from library defaults
 
-These go into a **Project Conventions** section of LIB-CONTEXT.md so builders know the project's layer on top of the raw library patterns.
+These go into a **Project Conventions** section of LIB-CONTEXT.md so builders know
+the project's layer on top of the raw library patterns.
+
+**If no `CLAUDE.md` exists** — skip this step entirely. Omit the "Project Conventions" section
+from LIB-CONTEXT.md output. This is normal for external users and fresh checkouts.
 
 ---
 
@@ -121,6 +126,7 @@ Source: ~/.llmdocs/docs/<library>/
 ---
 
 ## Project Conventions (from CLAUDE.md)
+[Omit this section entirely if the project has no CLAUDE.md]
 [Project-specific wrappers, error constants, invariants that override or extend library defaults]
 ```
 
