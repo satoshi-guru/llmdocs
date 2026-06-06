@@ -25,9 +25,11 @@ You will receive:
 ## Steps
 
 1. Read `PLAN_PATH` to confirm which libraries are in scope
-2. For each library in scope, check the **global doc store** (shared across every repo):
-   `ls ~/.llmdocs/docs/<library>/ 2>/dev/null` (also reachable at `~/.claude/docs/<library>/`).
-   **Prefer `~/.llmdocs/docs/<library>/COMPACT.md` if present** (~800 tokens) over reading raw pages.
+2. For each library in scope, check the **global doc store** (shared across every repo,
+   default `~/.llmdocs/docs/`, override with `$LLMDOCS_HOME`):
+   `ls "$LLMDOCS_HOME/docs/<library>/" 2>/dev/null`
+   (`~/.claude/docs/<library>/` is a symlink to the same location, created by the installer.)
+   **Prefer `$LLMDOCS_HOME/docs/<library>/COMPACT.md` if present** (~800 tokens) over reading raw pages.
 3. For each directory that exists: read COMPACT.md, else the most relevant raw files (filter by topic — skip translations, changelogs, deployment guides for services not in use)
 4. For libraries not in the store: note `/llmdoc <library>` to fetch them into the global store first (don't guess the API from memory)
 5. Write `{SPRINT_DIR}/LIB-CONTEXT.md` following the skill's output format
@@ -77,4 +79,4 @@ Fetch to improve: /llmdoc {library} for each missing
 - Do not write application code
 - Do not modify any source files
 - Do not run build commands (pnpm, prisma, webpack, etc.)
-- Do not fetch from the network — read only from the global doc store `~/.llmdocs/docs/` (also `~/.claude/docs/`)
+- Do not fetch from the network — read only from the global doc store `$LLMDOCS_HOME/docs/` (default `~/.llmdocs/docs/`, symlinked at `~/.claude/docs/`)

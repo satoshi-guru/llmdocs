@@ -27,6 +27,10 @@ Presets are entries in the `PRESETS` dict at the top of `llmdocs.py`. Adding one
 },
 ```
 
+> **Output path:** When this preset runs without `--out`, the `"out": "output/mysite"` value
+> is redirected to `~/.llmdocs/docs/mysite/` (the global store) automatically. Pass `--out /tmp/mysite`
+> to keep test output local.
+
 ## GitHub preset
 
 ```python

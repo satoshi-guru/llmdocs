@@ -91,8 +91,11 @@ Run `python llmdocs.py --list-presets` for the live list and where each lands in
 
 ## Output
 
+Preset runs (no `--out`) land in `~/.llmdocs/docs/<slug>/` — the global append-only store.
+Use `--out <path>` for local output. See [Global doc store](#global-doc-store).
+
 ```
-output/
+~/.llmdocs/docs/
   discord/
     INDEX.md                    ← full page list, grouped by section
     developers/

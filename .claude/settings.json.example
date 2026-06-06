@@ -1,4 +1,8 @@
 {
+  "env": {
+    "LLMDOCS_DIR": "/path/to/llmdocs",
+    "LLMDOCS_HOME": "~/.llmdocs"
+  },
   "permissions": {
     "allow": [
       "WebFetch(*)",

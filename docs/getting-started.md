@@ -20,14 +20,21 @@ python llmdocs.py --preset discord
 python llmdocs.py --url https://docs.example.com --out output/example
 ```
 
-That's it. Results land in `output/discord/` (or whatever `--out` you set).
+That's it. Results land in `~/.llmdocs/docs/discord/` (the global doc store). Override with
+`--out ./output/discord` if you want local output instead.
+
+## Where does output go?
+
+By default, every fetch lands in the **global doc store** at `~/.llmdocs/docs/<slug>/`,
+shared across all your repos. Set `$LLMDOCS_HOME` to move the store anywhere.
+Use `--out <path>` to override for a single run.
 
 ## What you get
 
 One `.md` file per page, organised to mirror the site's URL structure:
 
 ```
-output/
+~/.llmdocs/docs/
   discord/
     INDEX.md                              ← full page list
     developers/
@@ -53,7 +60,7 @@ url: https://discord.com/developers/docs/interactions/application-commands
 
 ## Re-running
 
-Runs are resumable. Raw HTML is cached in `output/<name>/_raw_html/`. Re-running the same command skips already-fetched pages.
+Runs are resumable. Raw HTML is cached in `~/.llmdocs/docs/<name>/_raw_html/` during the run. Re-running the same command skips already-fetched pages.
 
 To force a full re-fetch:
 
