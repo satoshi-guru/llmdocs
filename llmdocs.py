@@ -665,14 +665,36 @@ def main() -> int:
                              "Input: file, directory, or - for stdin.")
     parser.add_argument("--expand", action="store_true",
                         help="Expand a 'dense' file back to Markdown (no fetch).")
+    parser.add_argument("--check", action="store_true",
+                        help="Verify each page's committed '<name>.min.md' sibling matches a fresh "
+                             "deterministic 'min' (drift gate). Exit 1 on drift, 0 if up to date.")
     parser.add_argument("paths", nargs="*",
-                        help="Input path(s) for --compact/--expand (or - for stdin).")
+                        help="Input path(s) for --compact/--expand/--check (or - for stdin).")
     args = parser.parse_args()
 
-    if args.compact or args.expand:
+    if args.compact or args.expand or args.check:
         import compact as _compact
 
         RESERVED = {"INDEX.md", "COMPACT.md", "LOOKUP.md"}
+
+        if args.check:
+            failed = False
+            for target in (args.paths or []):
+                p = Path(target)
+                pages = ([f for f in sorted(p.glob("*.md")) if f.name not in RESERVED]
+                         if p.is_dir() else [p])
+                for f in pages:
+                    if f.name.endswith(".min.md"):
+                        continue  # don't re-min an already-min sibling
+                    recomputed = _compact.minify(f.read_text(encoding="utf-8"))
+                    expected = f.with_name(f.stem + ".min.md")
+                    if (not expected.exists()) or expected.read_text(encoding="utf-8") != recomputed:
+                        print(f"DRIFT: {expected} is stale or missing; "
+                              f"regenerate with `python llmdocs.py --compact min {f}`", file=sys.stderr)
+                        failed = True
+                    else:
+                        print(f"[check] up to date: {expected}")
+            return 1 if failed else 0
 
         def _transform(text: str) -> str:
             if args.expand:

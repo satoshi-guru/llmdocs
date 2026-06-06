@@ -42,3 +42,10 @@ def test_expand_roundtrips_stdin():
     r = _run(["--expand", "-"], cwd=ROOT, stdin="[2|H]\nk,v\na,1\n")
     assert r.returncode == 0
     assert "## H" in r.stdout and "| k | v |" in r.stdout
+
+
+def test_check_passes_on_committed_fixture():
+    # --check recomputes the deterministic `min` of page.md and compares to the
+    # committed page.min.md sibling. Fresh checkout must be drift-free.
+    r = _run(["--check", "store/example/alpha-lib/page.md"], cwd=ROOT)
+    assert r.returncode == 0, f"drift detected on fresh checkout: {r.stdout}{r.stderr}"

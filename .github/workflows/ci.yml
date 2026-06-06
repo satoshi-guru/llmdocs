@@ -35,6 +35,9 @@ jobs:
       - name: Store dashboard drift gate
         run: python -m scripts.store_index --store store/example --out store/INDEX.md --check
 
+      - name: Compaction drift gate (mechanical min tier)
+        run: python llmdocs.py --check store/example/alpha-lib/page.md
+
       - name: Leak gate (must find zero hits)
         # .github is excluded: this very file contains the pattern as its definition.
         run: |
