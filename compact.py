@@ -72,7 +72,7 @@ def minify(md_text):
 _BOLD = re.compile(r"(\*\*|__)(.*?)\1")
 _ITALIC = re.compile(r"(?<!\w)(\*|_)(.+?)\1(?!\w)")
 _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$", re.MULTILINE)
-_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}.*$")
+_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$")
 
 
 def _heading_to_tag(m):

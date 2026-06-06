@@ -174,3 +174,19 @@ def test_dense_preserves_headings_as_reachable_tags():
     out = compact.densify(COMPOSITE)
     assert "[1|mylib]" in out, "dense dropped the top-level heading title"
     assert "[2|install]" in out, "dense dropped the install heading title"
+
+
+# --- frontmatter + 1-dash separator (Task 3.2 data-loss fixes) ---------------
+
+def test_densify_keeps_yaml_frontmatter():
+    doc = "---\ntitle: x\n---\n\n# H\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n"
+    out = compact.densify(doc)
+    assert out.startswith("---"), "densify must not eat the YAML frontmatter delimiter"
+    assert "title: x" in out
+
+
+def test_densify_drops_one_dash_table_separator():
+    # A 1-dash hand-written separator must be dropped, not leaked as a CSV junk row.
+    out = compact.densify("| a | b |\n| - | - |\n| 1 | 2 |\n")
+    assert "a,b" in out and "1,2" in out
+    assert "-,-" not in out and "- | -" not in out

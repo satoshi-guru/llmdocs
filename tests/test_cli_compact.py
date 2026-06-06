@@ -58,3 +58,13 @@ def test_check_fails_on_non_normalised_page(tmp_path):
     r = _run(["--check", str(src)], cwd=ROOT)
     assert r.returncode == 1, f"expected exit 1 for non-normalised page, got: {r.stdout}{r.stderr}"
     assert "DRIFT" in r.stderr
+
+
+def test_expand_does_not_overwrite_input(tmp_path):
+    src = tmp_path / "doc.dense.md"
+    src.write_text("[2|H]\nk,v\na,1\n")
+    before = src.read_text()
+    r = _run(["--expand", str(src)], cwd=ROOT)
+    assert r.returncode == 0, r.stderr
+    assert src.read_text() == before, "--expand must not overwrite its own input file"
+    assert (tmp_path / "doc.md").exists(), "expand of doc.dense.md should write doc.md"

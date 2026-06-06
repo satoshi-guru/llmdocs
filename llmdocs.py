@@ -715,7 +715,19 @@ def main() -> int:
                 if args.out == "-":
                     sys.stdout.write(out_text)
                 else:
-                    dest = Path(args.out) if (args.out and len(files) == 1) else f.with_suffix(_suffix())
+                    if args.expand:
+                        # Expanding doc.dense.md / doc.min.md -> doc.md. f.with_suffix(".md")
+                        # would be a NO-OP on a .dense.md/.min.md name and clobber the input.
+                        dest = Path(re.sub(r"\.(dense|min)\.md$", ".md", f.name, flags=re.IGNORECASE))
+                        dest = f.with_name(dest.name)
+                        if dest == f:
+                            # No infix to strip -> writing back would overwrite the source. Emit to stdout.
+                            sys.stdout.write(out_text)
+                            continue
+                    elif args.out and len(files) == 1:
+                        dest = Path(args.out)
+                    else:
+                        dest = f.with_suffix(_suffix())
                     dest.write_text(out_text, encoding="utf-8")
                     print(f"[compact] {f} -> {dest}")
         return 0
