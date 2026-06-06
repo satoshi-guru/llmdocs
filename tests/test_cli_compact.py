@@ -68,3 +68,19 @@ def test_expand_does_not_overwrite_input(tmp_path):
     assert r.returncode == 0, r.stderr
     assert src.read_text() == before, "--expand must not overwrite its own input file"
     assert (tmp_path / "doc.md").exists(), "expand of doc.dense.md should write doc.md"
+
+
+def test_compact_min_noop_on_clean_doc(tmp_path):
+    # Fetch-time --raw skips compaction entirely; at the compaction CLI the analogous
+    # invariant is that `min` on an already-clean doc returns it byte-for-byte (no spurious edits).
+    clean = "# T\n\nbody\n"
+    r = _run(["--compact", "min", "-"], cwd=ROOT, stdin=clean)
+    assert r.returncode == 0
+    assert r.stdout == clean, f"min added/dropped bytes on a clean doc: {r.stdout!r}"
+
+
+def test_compact_min_stdin_exact_output():
+    # tests-F6: tighten the weak `"# T" in stdout` assertion to a full-output compare.
+    r = _run(["--compact", "min", "-"], cwd=ROOT, stdin="# T\n\n\nbody\n\n")
+    assert r.returncode == 0
+    assert r.stdout == "# T\n\nbody\n"

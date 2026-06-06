@@ -190,3 +190,37 @@ def test_densify_drops_one_dash_table_separator():
     out = compact.densify("| a | b |\n| - | - |\n| 1 | 2 |\n")
     assert "a,b" in out and "1,2" in out
     assert "-,-" not in out and "- | -" not in out
+
+
+# --- fence safety at EOF (tests-F2; a real past bug) ---
+
+def test_split_unclosed_fence_at_eof_is_code():
+    # An unclosed fence running to EOF must be treated as CODE, not prose,
+    # or densify/minify will corrupt the code lines inside it.
+    text = "```py\na, b = 1, 2\n## not a heading\n"
+    chunks = list(compact._split_on_fences(text))
+    code = [c for is_code, c in chunks if is_code]
+    assert any("a, b = 1, 2" in c for c in code), "unclosed fence at EOF lost its code chunk"
+
+
+def test_densify_does_not_corrupt_unclosed_fence_at_eof():
+    text = "```py\na, b = 1, 2\n## not a heading\n"
+    out = compact.densify(text)
+    assert "a, b = 1, 2" in out          # NOT turned into a CSV row
+    assert "[2|not a heading]" not in out # NOT heading-tagged inside code
+
+
+def test_split_fence_closed_at_eof_no_trailing_newline():
+    text = "```\ncode2 = 2\n```"          # closing fence is the last byte
+    chunks = list(compact._split_on_fences(text))
+    assert len(chunks) == 1 and chunks[0][0] is True
+    assert "code2 = 2" in chunks[0][1]
+
+
+# --- dense -> expand round-trip THROUGH a code fence (tests-F5) ---
+
+def test_dense_expand_roundtrip_preserves_code_fence():
+    src = "## H\n\n```py\nrow = a, b, c   # comma line inside code\n```\n\n| x | y |\n| - | - |\n| 1 | 2 |\n"
+    recovered = compact.expand(compact.densify(src))
+    assert "row = a, b, c   # comma line inside code" in recovered, "code comma-line got table-parsed"
+    assert "## H" in recovered

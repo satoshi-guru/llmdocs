@@ -22,9 +22,13 @@ coexist — mechanical runs first/early in the core (no API key), semantic on to
 import re
 
 # A fenced code block: opening fence (>=3 backticks or tildes, optional info string)
-# through the matching closing fence of the same character.
+# through the matching closing fence of the same character, OR running to EOF when
+# the fence is never closed (unclosed-at-EOF guard — prevents densify from treating
+# the code lines inside an unclosed fence as prose).
 _FENCE_RE = re.compile(
-    r"^[ \t]*(`{3,}|~{3,})[^\n]*\n.*?^[ \t]*\1[ \t]*$\n?",
+    r"^[ \t]*(`{3,}|~{3,})[^\n]*\n"          # opening fence line
+    r"(?:.*?^[ \t]*\1[ \t]*$\n?"             # ...through the matching closing fence
+    r"|.*\Z)",                               # ...OR to EOF if never closed
     re.DOTALL | re.MULTILINE,
 )
 
@@ -89,6 +93,10 @@ def densify(md_text):
     text = minify(md_text)
 
     def prose(t):
+        # Preserve whether the chunk ends with a newline — needed to keep the
+        # separator between a heading tag and the following code fence opening,
+        # which would otherwise be joined onto the same line.
+        ends_newline = t.endswith("\n")
         t = _BOLD.sub(r"\2", t)
         t = _ITALIC.sub(r"\2", t)
         t = _HEADING.sub(_heading_to_tag, t)
@@ -103,6 +111,11 @@ def densify(md_text):
                 out.append(line)
         t = "\n".join(out)
         t = re.sub(r"\n{2,}", "\n", t)
+        # Restore the trailing newline consumed by the heading regex's \s* — without
+        # this, a prose chunk ending in "heading\n\n" would become "tag" (no \n),
+        # and the adjacent code chunk's opening fence would be glued to the tag.
+        if ends_newline and not t.endswith("\n"):
+            t += "\n"
         return t
 
     return _map_prose(text, prose).strip() + "\n"
@@ -113,16 +126,43 @@ def densify(md_text):
 _TAG = re.compile(r"^\[(\d)\|(.*)\]$")
 
 
+_FENCE_OPEN = re.compile(r"^[ \t]*(`{3,}|~{3,})")
+
+
 def expand(dense_text):
     """Best-effort round-trip of `dense` back to readable Markdown.
 
     NOTE: lossy by design — emphasis is gone, and a code line containing commas
     cannot be distinguished from a CSV row. `min` is the lossless-ish default;
     use `dense`+`expand` only when you accept this.
+
+    Code fences in the dense input are passed through verbatim (their contents
+    are never mis-parsed as CSV rows or headings).
     """
     out = []
     in_table = False
+    in_fence = False
+    fence_char: str | None = None
     for line in dense_text.split("\n"):
+        # Track fence state so code content is never CSV-expanded.
+        fm = _FENCE_OPEN.match(line)
+        if fm:
+            fc = fm.group(1)[0]
+            if not in_fence:
+                in_fence = True
+                fence_char = fc
+                in_table = False
+                out.append(line)
+                continue
+            elif fc == fence_char:
+                in_fence = False
+                fence_char = None
+                out.append(line)
+                continue
+        if in_fence:
+            out.append(line)
+            continue
+
         s = line.strip()
         m = _TAG.match(s)
         if m:
