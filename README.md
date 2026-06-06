@@ -207,9 +207,9 @@ alone?). Full table + methodology in [`bench/REPORT.md`](bench/REPORT.md):
 | Pydantic |   726,298 | 1,264 | **99.83%** | 100% | 100% |
 
 **Honest framing:** the % is vs reading the *entire* raw corpus. The sharper point the
-benchmark proves is that COMPACT isn't just smaller — it's **better targeted**: a same-budget
-*skim* of the raw docs dropped **56%** of Pydantic's key signatures (and scored 0% on the
-judge), while the 1.3k-token COMPACT kept **100%**. The grep tier (`LOOKUP.md`) goes further —
+benchmark proves is that COMPACT isn't just smaller — it's **better targeted**: an **~80× larger**
+raw-docs skim (≈100k tokens of Pydantic's raw pages) still **dropped 56%** of the key signatures
+(and scored 0% on the judge), while the 1.3k-token COMPACT kept **100%**. The grep tier (`LOOKUP.md`) goes further —
 ~99.9% reduction, answering "does this API exist / what's its signature" in 1–2 tokens.
 
 **Broader sample** across the store (token-only — `chars/4`; recall/judge measured for the
