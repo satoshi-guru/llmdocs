@@ -105,3 +105,72 @@ def test_dense_then_expand_recovers_heading_and_table_text():
     assert "## Params" in recovered
     assert "| name | type |" in recovered
     assert "| id | int |" in recovered
+
+
+# --- fidelity-grade compaction tests (First Principle) ----------------------
+#
+# Composite doc with collapsible blank runs + trailing ws + an HTML comment so
+# `min` has real work to do, PLUS a multi-signature code block + table whose
+# signal MUST survive.
+
+COMPOSITE = """\
+# mylib
+
+
+<!-- nav cruft to strip -->
+
+## install
+
+
+Install with pip.
+
+
+
+```python
+def connect(host: str, port: int = 443, *, tls: bool = True) -> Connection: ...
+def send(conn: Connection, payload: bytes, retries: int = 3) -> Response: ...
+class Client:
+    def request(self, method: str, url: str, timeout: float = 30.0) -> Response: ...
+```
+
+
+
+| param | type | default |
+| --- | --- | --- |
+| host | str | required |
+| port | int | 443 |
+"""
+
+_SIGNATURES = ("def connect(", "def send(", "def request(")
+_HEADINGS = ("# mylib", "## install")
+
+
+def test_min_reduces_size():
+    out = compact.minify(COMPOSITE)
+    assert len(out) < len(COMPOSITE), "min must shrink a doc with collapsible blanks/comments"
+
+
+def test_min_preserves_every_function_signature():
+    out = compact.minify(COMPOSITE)
+    for sig in _SIGNATURES:
+        assert sig in out, f"min dropped a signature: {sig}"
+
+
+def test_min_preserves_section_headings():
+    out = compact.minify(COMPOSITE)
+    for h in _HEADINGS:
+        assert h in out, f"min dropped a heading (overview structure): {h}"
+
+
+def test_dense_reduces_size_but_keeps_signatures():
+    out = compact.densify(COMPOSITE)
+    assert len(out) < len(COMPOSITE), "dense must shrink the composite doc"
+    for sig in _SIGNATURES:
+        assert sig in out, f"dense dropped a signature: {sig}"
+
+
+def test_dense_preserves_headings_as_reachable_tags():
+    # dense rewrites '## install' -> '[2|install]'; the title text must remain reachable.
+    out = compact.densify(COMPOSITE)
+    assert "[1|mylib]" in out, "dense dropped the top-level heading title"
+    assert "[2|install]" in out, "dense dropped the install heading title"
