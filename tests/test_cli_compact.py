@@ -45,7 +45,16 @@ def test_expand_roundtrips_stdin():
 
 
 def test_check_passes_on_committed_fixture():
-    # --check recomputes the deterministic `min` of page.md and compares to the
-    # committed page.min.md sibling. Fresh checkout must be drift-free.
+    # --check asserts idempotence: minify(page) == page.
+    # The committed fixture is already min-normalised so exit 0 is expected.
     r = _run(["--check", "store/example/alpha-lib/page.md"], cwd=ROOT)
-    assert r.returncode == 0, f"drift detected on fresh checkout: {r.stdout}{r.stderr}"
+    assert r.returncode == 0, f"idempotence check failed on fresh checkout: {r.stdout}{r.stderr}"
+
+
+def test_check_fails_on_non_normalised_page(tmp_path):
+    # A page with extra blank lines is NOT min-normalised → exit 1.
+    src = tmp_path / "page.md"
+    src.write_text("# Title\n\n\nbody text\n\n\n")
+    r = _run(["--check", str(src)], cwd=ROOT)
+    assert r.returncode == 1, f"expected exit 1 for non-normalised page, got: {r.stdout}{r.stderr}"
+    assert "DRIFT" in r.stderr

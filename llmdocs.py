@@ -666,8 +666,8 @@ def main() -> int:
     parser.add_argument("--expand", action="store_true",
                         help="Expand a 'dense' file back to Markdown (no fetch).")
     parser.add_argument("--check", action="store_true",
-                        help="Verify each page's committed '<name>.min.md' sibling matches a fresh "
-                             "deterministic 'min' (drift gate). Exit 1 on drift, 0 if up to date.")
+                        help="Verify each committed store page is already min-normalised "
+                             "(idempotence gate). Exit 1 if minify(page) != page, 0 if up to date.")
     parser.add_argument("paths", nargs="*",
                         help="Input path(s) for --compact/--expand/--check (or - for stdin).")
     args = parser.parse_args()
@@ -685,15 +685,14 @@ def main() -> int:
                          if p.is_dir() else [p])
                 for f in pages:
                     if f.name.endswith(".min.md"):
-                        continue  # don't re-min an already-min sibling
-                    recomputed = _compact.minify(f.read_text(encoding="utf-8"))
-                    expected = f.with_name(f.stem + ".min.md")
-                    if (not expected.exists()) or expected.read_text(encoding="utf-8") != recomputed:
-                        print(f"DRIFT: {expected} is stale or missing; "
-                              f"regenerate with `python llmdocs.py --compact min {f}`", file=sys.stderr)
+                        continue  # skip any stray .min.md inputs
+                    text = f.read_text(encoding="utf-8")
+                    if _compact.minify(text) != text:
+                        print(f"DRIFT: {f} is not min-normalised "
+                              f"(run --compact min in place)", file=sys.stderr)
                         failed = True
                     else:
-                        print(f"[check] up to date: {expected}")
+                        print(f"[check] up to date: {f}")
             return 1 if failed else 0
 
         def _transform(text: str) -> str:
