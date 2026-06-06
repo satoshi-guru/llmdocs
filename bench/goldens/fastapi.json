@@ -1,0 +1,44 @@
+{
+  "lib": "fastapi",
+  "note": "Golden set for the compaction benchmark. must_have = signatures that MUST survive compaction (recall gate). qa = questions answerable from the docs (LLM-judge). lookup = the grep-tier lines doc-indexer would emit.",
+  "must_have": [
+    "FastAPI(",
+    "APIRouter(",
+    "Depends(",
+    "HTTPException(",
+    "BackgroundTasks",
+    "include_router",
+    "lifespan",
+    "Query(",
+    "Body("
+  ],
+  "qa": [
+    {
+      "q": "How do you run startup and shutdown code in a modern FastAPI app?",
+      "reference": "Use a lifespan async context manager (an @asynccontextmanager function that yields) and pass it as FastAPI(lifespan=...). The older @app.on_event(\"startup\")/@app.on_event(\"shutdown\") handlers are deprecated."
+    },
+    {
+      "q": "How do you provide a database session to routes so cleanup runs after the response?",
+      "reference": "Write a dependency function that creates the session, yields it inside try/finally (closing it in finally), and inject it into routes with Depends(get_db)."
+    },
+    {
+      "q": "How do you return a 400 error from inside a route handler?",
+      "reference": "Raise HTTPException(status_code=400, detail=\"...\")."
+    },
+    {
+      "q": "How do you group related routes under a common path prefix and attach them to the app?",
+      "reference": "Create an APIRouter(prefix=\"/...\") , define routes on it, then register it with app.include_router(router) at module level."
+    }
+  ],
+  "lookup": [
+    "fastapi | FastAPI(title, lifespan) | create app instance",
+    "fastapi | APIRouter(prefix, tags) | group routes; register via app.include_router()",
+    "fastapi | @router.get(path, response_model, status_code) | route decorator",
+    "fastapi | Depends(callable) | dependency injection marker",
+    "fastapi | HTTPException(status_code, detail) | raise an HTTP error",
+    "fastapi | Query(default, ...) | declare a query parameter",
+    "fastapi | Body(...) | required JSON body (Body(default) = optional)",
+    "fastapi | BackgroundTasks.add_task(fn, *args) | run work after the response",
+    "fastapi | lifespan=asynccontextmanager | startup/shutdown (replaces on_event)"
+  ]
+}

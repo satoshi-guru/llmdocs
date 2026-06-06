@@ -1,0 +1,14 @@
+output/
+audits/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# Local Claude Code config — ship settings.json.example instead
+.claude/settings.json

@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Compile (engine + compactor + scripts + bench)
+        run: python -m py_compile llmdocs.py compact.py scripts/*.py bench/*.py
+
+      - name: Unit tests (deterministic compaction)
+        run: python -m pytest tests/ -q
+
+      - name: Smoke — list presets
+        run: python llmdocs.py --list-presets
+
+      - name: Benchmark smoke (fixture store, deterministic recall+token; judge auto-skips)
+        run: python bench/bench.py --libs alpha-lib --store store/example --out /tmp/bench-ci.md
+
+      - name: Store dashboard drift gate
+        run: python -m scripts.store_index --store store/example --out store/INDEX.md --check
+
+      - name: Leak gate (must find zero hits)
+        # .github is excluded: this very file contains the pattern as its definition.
+        run: |
+          if grep -rniE 'REDACTED_HOST|REDACTED_ORG|REDACTED_USER|/home/[a-z]+/|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|root@|ssh ' \
+               --exclude-dir=.git --exclude-dir=.github .; then
+            echo "::error::leak gate found forbidden strings"
+            exit 1
+          fi
+          echo "leak gate clean"

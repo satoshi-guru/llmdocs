@@ -1,0 +1,18 @@
+{
+  "lib": "alpha-lib",
+  "note": "Fixture golden for CI smoke — matches store/example/alpha-lib. Keeps the benchmark harness exercised (recall gate + token cost) without network or an LLM.",
+  "must_have": [
+    "connect(host, port)",
+    "send(msg)"
+  ],
+  "qa": [
+    {
+      "q": "How do you open a connection in alpha-lib?",
+      "reference": "connect(host, port) returns a Conn."
+    }
+  ],
+  "lookup": [
+    "alpha-lib | connect(host, port) | open a connection",
+    "alpha-lib | send(msg) | send a message, returns ack"
+  ]
+}

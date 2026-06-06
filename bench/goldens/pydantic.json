@@ -1,0 +1,45 @@
+{
+  "lib": "pydantic",
+  "note": "Golden set for the compaction benchmark. must_have = signatures that MUST survive compaction (recall gate). qa = questions answerable from the docs (LLM-judge). lookup = the grep-tier lines doc-indexer would emit.",
+  "must_have": [
+    "BaseModel",
+    "Field(",
+    "model_dump(",
+    "model_dump_json(",
+    "model_validate(",
+    "field_validator",
+    "model_validator",
+    "ConfigDict(",
+    "TypeAdapter("
+  ],
+  "qa": [
+    {
+      "q": "In Pydantic v2, how do you convert a model instance to a dict, and what is the deprecated v1 method?",
+      "reference": "Use model.model_dump() (and model_dump_json() for a JSON string). The v1 .dict()/.json() methods are deprecated/removed in v2."
+    },
+    {
+      "q": "How do you write a field validator in Pydantic v2?",
+      "reference": "Use the @field_validator(\"field\", mode=\"after\") decorator on a @classmethod that returns the (possibly transformed) value. The v1 @validator is replaced by @field_validator and must be a classmethod."
+    },
+    {
+      "q": "How do you validate data against a non-model type like list[int] in Pydantic v2?",
+      "reference": "Use TypeAdapter(list[int]) and call .validate_python(...) or .validate_json(...)."
+    },
+    {
+      "q": "How do you make a Pydantic model reject unknown fields?",
+      "reference": "Set model_config = ConfigDict(extra=\"forbid\")."
+    }
+  ],
+  "lookup": [
+    "pydantic | BaseModel | base class for validated models",
+    "pydantic | Field(default, alias, gt, lt, min_length, max_length, pattern) | field constraints/metadata",
+    "pydantic | model.model_dump(by_alias, mode) | instance -> dict (replaces .dict())",
+    "pydantic | model.model_dump_json() | instance -> JSON string (replaces .json())",
+    "pydantic | Model.model_validate(obj) | validate+construct from dict (classmethod)",
+    "pydantic | Model.model_validate_json(s) | validate+construct from JSON (classmethod)",
+    "pydantic | @field_validator(name, mode='after') | per-field validator (on @classmethod)",
+    "pydantic | @model_validator(mode='after') | whole-model validator",
+    "pydantic | ConfigDict(extra='forbid', frozen, populate_by_name) | model config",
+    "pydantic | TypeAdapter(type) | validate non-model types"
+  ]
+}
