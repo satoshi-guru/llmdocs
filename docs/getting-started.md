@@ -73,3 +73,4 @@ python llmdocs.py --preset discord --no-cache
 - [Presets](presets.md) — built-in site configs
 - [HTTP vs GitHub strategy](strategies.md) — when to use which
 - [Adding a custom preset](add-preset.md) — add your own site
+- [Consuming the output](consuming.md) — the LOOKUP → COMPACT → min/dense → raw tier ladder

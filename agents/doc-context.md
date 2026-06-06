@@ -25,14 +25,30 @@ You will receive:
 ## Steps
 
 1. Read `PLAN_PATH` to confirm which libraries are in scope
-2. For each library in scope, check the **global doc store** (shared across every repo,
-   default `~/.llmdocs/docs/`, override with `$LLMDOCS_HOME`):
-   `ls "$LLMDOCS_HOME/docs/<library>/" 2>/dev/null`
-   (`~/.claude/docs/<library>/` is a symlink to the same location, created by the installer.)
-   **Prefer `$LLMDOCS_HOME/docs/<library>/COMPACT.md` if present** (~800 tokens) over reading raw pages.
-3. For each directory that exists: read COMPACT.md, else the most relevant raw files (filter by topic — skip translations, changelogs, deployment guides for services not in use)
-4. For libraries not in the store: note `/llmdoc <library>` to fetch them into the global store first (don't guess the API from memory)
-5. Write `{SPRINT_DIR}/LIB-CONTEXT.md` following the skill's output format
+2. For each library in scope, check the **global doc store** (shared across every repo):
+   `ls "$LLMDOCS_HOME/docs/<library>/" 2>/dev/null` (defaults to `~/.llmdocs/docs/`). Read tiers
+   cheapest-first and **stop as soon as you have the answer** — do not climb to a richer tier than the
+   task needs:
+
+   1. **LOOKUP (≈0 tokens).** `grep -i "<symbol>" "$LLMDOCS_HOME/docs/<library>/LOOKUP.md"` (and the
+      shared `$LLMDOCS_HOME/docs/LOOKUP.md`). If a single signature/fact is all you need and grep
+      finds it, **record it and move on — read nothing further for that library.**
+   2. **COMPACT (~800 tokens).** If you need several signatures or the API shape, read
+      `COMPACT.md`. This covers the whole surface in compact form.
+   3. **min/dense page (bounded).** If COMPACT is missing or lacks a needed detail, read the
+      `*.min.md` (or `*.dense.md`) variant of the most relevant page — **prefer these over the full
+      raw page** and read **at most 2 pages** per library in this fallback.
+   4. **raw page (last resort, always available).** Only read the full raw `*.md` page when the
+      detail you need is not in any tier above. Raw is never removed and never off-limits — it is the
+      floor of the ladder.
+
+   **Token ceiling for the fallback (steps 3-4): ≤ 6 000 tokens total per library.** If answering the
+   task would require more than that, **stop, list the specific pages you would need, and ask the
+   orchestrator** rather than silently pulling tens of thousands of tokens into context. (This bounds
+   default cost; it does not hide content — raw remains on disk and reachable on an explicit request.)
+3. For libraries not in the store: note `/llmdoc <library>` to fetch them into the global store first
+   (don't guess the API from memory)
+4. Write `{SPRINT_DIR}/LIB-CONTEXT.md` following the skill's output format
 
 ## What to Extract (per library)
 
