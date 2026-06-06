@@ -34,7 +34,15 @@ def main() -> int:
         return 2
     lib = sys.argv[1].strip()
 
-    new = [ln.rstrip() for ln in sys.stdin.read().splitlines() if ln.strip()]
+    raw_new = [ln.rstrip() for ln in sys.stdin.read().splitlines() if ln.strip()]
+    # Reject lines without a '|' — they would be ingested as a phantom library name (scripts-F3).
+    bad = [ln for ln in raw_new if "|" not in ln]
+    for ln in bad:
+        print(f"warning: skipping malformed LOOKUP line (no '|'): {ln!r}", file=sys.stderr)
+    new = [ln for ln in raw_new if "|" in ln]
+    # Dedup the incoming block, preserving order (scripts-F8): one line per API.
+    seen: set[str] = set()
+    new = [ln for ln in new if not (ln in seen or seen.add(ln))]
     existing = []
     if LOOKUP.exists():
         existing = [ln.rstrip() for ln in LOOKUP.read_text(encoding="utf-8").splitlines() if ln.strip()]

@@ -65,7 +65,7 @@ def render(store: Path) -> str:
         pages = _raw_pages(lib)
         raw_tok = sum(est_tokens(p.read_text(encoding="utf-8", errors="ignore")) for p in pages)
         compact = lib / "COMPACT.md"
-        compact_tok = est_tokens(compact.read_text(encoding="utf-8")) if compact.exists() else 0
+        compact_tok = est_tokens(compact.read_text(encoding="utf-8", errors="ignore")) if compact.exists() else 0
         reduction = f"{(1 - compact_tok / raw_tok) * 100:.2f}%" if (compact_tok and raw_tok) else "—"
         tiers = "".join([
             "R" if pages else "·",
