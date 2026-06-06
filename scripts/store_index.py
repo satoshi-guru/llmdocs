@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.manifest import est_tokens, SKIP_FILES, _SKIP_DIRS, _raw_pages  # noqa: E402
+from scripts.manifest import est_tokens, _SKIP_DIRS, _raw_pages  # noqa: E402
 
 DEFAULT_STORE = Path(os.environ.get("LLMDOCS_HOME") or (Path.home() / ".llmdocs")) / "docs"
 _INDEXED_RE = re.compile(r"Indexed:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})")

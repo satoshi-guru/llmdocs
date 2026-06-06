@@ -32,7 +32,6 @@ import sys
 import threading
 import time
 import urllib.parse
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 

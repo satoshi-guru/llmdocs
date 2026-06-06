@@ -70,7 +70,7 @@ def test_expand_does_not_overwrite_input(tmp_path):
     assert (tmp_path / "doc.md").exists(), "expand of doc.dense.md should write doc.md"
 
 
-def test_compact_min_noop_on_clean_doc(tmp_path):
+def test_compact_min_noop_on_clean_doc():
     # Fetch-time --raw skips compaction entirely; at the compaction CLI the analogous
     # invariant is that `min` on an already-clean doc returns it byte-for-byte (no spurious edits).
     clean = "# T\n\nbody\n"
