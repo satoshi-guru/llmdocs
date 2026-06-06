@@ -25,15 +25,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from scripts.manifest import est_tokens, SKIP_FILES  # noqa: E402  (shared helpers)
+from scripts.manifest import est_tokens, SKIP_FILES, _SKIP_DIRS, _raw_pages  # noqa: E402
 
 DEFAULT_STORE = Path(os.environ.get("LLMDOCS_HOME") or (Path.home() / ".llmdocs")) / "docs"
 _INDEXED_RE = re.compile(r"Indexed:\s*([0-9]{4}-[0-9]{2}-[0-9]{2})")
-
-
-def _raw_pages(lib: Path) -> list[Path]:
-    return [p for p in lib.rglob("*.md")
-            if p.name not in SKIP_FILES and "_raw_html" not in p.parts]
 
 
 def _indexed_date(compact: Path) -> str:
@@ -61,7 +56,10 @@ def render(store: Path) -> str:
 
     lookup_libs = _lookup_libs(store)
     rows, tot_pages, tot_raw, tot_compact = [], 0, 0, 0
-    for lib in sorted(p for p in store.iterdir() if p.is_dir()):
+    for lib in sorted(
+        p for p in store.iterdir()
+        if p.is_dir() and not p.name.startswith(".") and p.name not in _SKIP_DIRS
+    ):
         pages = _raw_pages(lib)
         raw_tok = sum(est_tokens(p.read_text(encoding="utf-8", errors="ignore")) for p in pages)
         compact = lib / "COMPACT.md"

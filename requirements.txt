@@ -1,6 +1,6 @@
 beautifulsoup4>=4.14.0
 html2text>=2025.4.0
-lxml>=6.1.0
+lxml>=5.0
 requests>=2.31.0
 
 # Dev/test deps are in requirements-dev.txt (pip install -r requirements-dev.txt)
