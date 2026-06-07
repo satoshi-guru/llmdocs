@@ -189,6 +189,17 @@ def test_url_to_path_distinct_traversal_urls_do_not_collide(tmp_path):
     assert k1 != k2
 
 
+# --- _cache_key: long-URL collision (A7) --------------------------------------
+
+def test_cache_key_no_collision_past_prefix():
+    # Two URLs identical for >120 chars but differing after must NOT share a key.
+    prefix = "https://example.com/docs/" + "a" * 120
+    assert L._cache_key(prefix + "/one") != L._cache_key(prefix + "/two")
+
+def test_cache_key_distinct_for_distinct_urls():
+    assert L._cache_key("https://x.io/a") != L._cache_key("https://x.io/b")
+
+
 # --- _write_page: shared per-page writer (incremental crawl + github) ---------
 
 def test_write_page_frontmatter_and_entry(tmp_path):

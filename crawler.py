@@ -318,6 +318,14 @@ def _norm_url(url: str) -> str:
     return urllib.parse.urlparse(url)._replace(fragment="").geturl()
 
 
+def _cache_key(url: str) -> str:
+    """Raw-HTML cache filename stem for a URL. A truncated sanitized URL collided
+    when two URLs shared a 120-char prefix (the 2nd was silently served the 1st's
+    cached HTML); uniqueness now comes from a full-URL hash. The readable prefix is
+    only for humans browsing _raw_html/."""
+    return re.sub(r"[^\w]", "_", url)[:80] + "_" + hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
+
+
 def _file_key(url: str, out_dir: Path) -> str:
     """Output-file identity for a URL. /doc/x and /doc/x/ map to the same file, so
     this collapses such variants — used to avoid double-fetching and duplicate
@@ -436,8 +444,7 @@ def _fetch_and_extract(
 ) -> tuple[dict | None, list[str], dict | None]:
     """Fetch one URL, extract markdown, return (page_or_None, next_links, error_or_None).
     Thread-safe — no shared state mutated here beyond logging."""
-    cache_key = re.sub(r"[^\w]", "_", url)[:120]
-    cache_file = raw_dir / f"{cache_key}.html"
+    cache_file = raw_dir / f"{_cache_key(url)}.html"
 
     if cache_file.exists():
         html = cache_file.read_text(encoding="utf-8", errors="replace")
