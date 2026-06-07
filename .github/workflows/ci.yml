@@ -41,7 +41,7 @@ jobs:
       - name: Leak gate (must find zero hits)
         # .github is excluded: this very file contains the pattern as its definition.
         run: |
-          if grep -rniE 'REDACTED_HOST|REDACTED_ORG|REDACTED_USER|/home/[a-z]+/|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|root@|ssh ' \
+          if grep -rniE 'REDACTED_HOST|REDACTED_ORG|REDACTED_USER|/home/[a-z]+/|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|example-site|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|root@|ssh ' \
                --exclude-dir=.git --exclude-dir=.github .; then
             echo "::error::leak gate found forbidden strings"
             exit 1

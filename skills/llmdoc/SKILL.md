@@ -74,7 +74,6 @@ Arguments: $ARGUMENTS
 | Alias | Fetches |
 |-------|---------|
 | hyperliquid | **engine preset** → `--preset hyperliquid` (tuned GitBook selectors + path prefix) |
-| example-site | **engine preset** → `--preset example-site` (third-party Hyperliquid analytics — fills, trades, vault data) |
 | ethers | https://docs.ethers.org/v6/ |
 | viem | https://viem.sh/docs/getting-started |
 
@@ -107,7 +106,7 @@ Examples:
 1. **Parse $ARGUMENTS** — resolve each token in THIS ORDER (first match wins). The order
    matters because some sites can only be fetched correctly via an engine preset:
    1. **Engine preset name** — one of the names from
-      `… llmdocs.py --list-presets` (currently `discord`, `hyperliquid`, `example-site`,
+      `… llmdocs.py --list-presets` (currently `discord`, `hyperliquid`,
       `openai`, `anthropic`; always run `--list-presets` for the live list). Fetch with
       `--preset <name>`. The preset carries the per-site **strategy** and tuned crawl config:
       e.g. `discord` uses the GitHub strategy because the Discord docs are a React SPA — a

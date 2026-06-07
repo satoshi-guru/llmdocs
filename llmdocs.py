@@ -211,20 +211,6 @@ PRESETS: dict[str, dict] = {
         "same_domain_only": True,
         "rate_limit": 0.6,
     },
-    # Hypedexer — third-party Hyperliquid analytics API (fills, trades, vault data)
-    "example-site": {
-        "name": "Hypedexer API Docs",
-        "strategy": "http",
-        "url": "https://docs.example-site.com",
-        "out": "output/example-site",
-        "content_selectors": ["article", "main", ".page-body", "[class*='content']"],
-        "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']",
-                           "[class*='toc']", "[class*='navbar']"],
-        "max_depth": 5,
-        "max_pages": 150,
-        "same_domain_only": True,
-        "rate_limit": 0.5,
-    },
     # OpenAI platform docs
     "openai": {
         "name": "OpenAI Platform Docs",

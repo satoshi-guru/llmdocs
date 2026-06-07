@@ -81,7 +81,6 @@ python llmdocs.py --list-presets
 |--------|--------|----------|
 | `discord` | github.com/discord/discord-api-docs | GitHub clone (React SPA) |
 | `hyperliquid` | hyperliquid.gitbook.io/hyperliquid-docs | HTTP crawl (GitBook) |
-| `example-site` | docs.example-site.com | HTTP crawl |
 | `openai` | platform.openai.com/docs | HTTP crawl |
 | `anthropic` | docs.anthropic.com | HTTP crawl |
 
