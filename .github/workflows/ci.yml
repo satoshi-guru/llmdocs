@@ -39,14 +39,22 @@ jobs:
         run: python crawler.py --check store/example/alpha-lib/page.md
 
       - name: Leak gate (must find zero hits)
-        # Uses `git grep` so ONLY tracked files are scanned — never the CI working
-        # tree, which holds generated artifacts (e.g. __pycache__/*.pyc embedding
-        # /home/runner paths) that would false-positive. .github is excluded: this
-        # workflow file defines the patterns. Fail-CLOSED: a grep tooling error
-        # (exit >=2) is treated as a leak, not a pass.
+        # The denylist (private infra/identity strings) lives in the LEAK_DENYLIST
+        # repo secret, NOT in this public workflow file — otherwise the gate would
+        # publish the very strings it guards against. Uses `git grep` so ONLY tracked
+        # files are scanned, excluding .github. On forks/PRs without secret access the
+        # gate is skipped with a warning (a fork can't introduce the owner's private
+        # strings; merges to main re-run it with the secret present). Fail-CLOSED: a
+        # real grep tooling error (exit >=2) is treated as a leak, not a pass.
+        env:
+          LEAK_DENYLIST: ${{ secrets.LEAK_DENYLIST }}
         run: |
+          if [ -z "$LEAK_DENYLIST" ]; then
+            echo "::warning::LEAK_DENYLIST secret unavailable (fork PR?) — leak gate skipped"
+            exit 0
+          fi
           set +e
-          hits=$(git grep -nIE 'REDACTED_HOST|REDACTED_ORG|REDACTED_USER|/home/[a-z]+/|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|root@|ssh ' -- . ':!.github/*')
+          hits=$(git grep -nIE "$LEAK_DENYLIST" -- . ':!.github/*')
           rc=$?
           set -e
           # git grep: 0 = match found, 1 = no match (good), >=2 = real error
