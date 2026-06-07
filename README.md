@@ -178,6 +178,17 @@ deletes asset files (guarded), `--check` is a CI gate. INDEX drift is reported,
 not auto-fixed — re-fetch the slug with the current engine to regenerate a
 truthful INDEX.
 
+### Provenance & versioning
+
+Every fetch records what produced it: the `INDEX.md` header carries `Engine: <sha>`
++ `Fetched: <date>`, and each page's frontmatter carries `fetched_with` /
+`fetched_at` (engine id = a `VERSION` file if present, else the engine repo's short
+git sha). Use `--archive-existing` to **never overwrite** a slug: before writing, an
+existing copy is moved to `<store>/.archive/<slug>@<old-engine>-<timestamp>/`, so
+older versions are kept for cross-version comparison. The canonical path
+`~/.llmdocs/docs/<slug>/` always holds the current copy (skills read it unchanged);
+store-targeted fetches (via `/llmdoc`) should pass `--archive-existing`.
+
 > Skills run from your project dir, so they locate the engine via **`$LLMDOCS_DIR`** (your clone),
 > set by `skills/install.sh`. The store path is **`$LLMDOCS_HOME`** (default `~/.llmdocs`); the
 > crawler User-Agent is **`$LLMDOCS_UA`**.

@@ -806,8 +806,36 @@ def _write_index(entries: list[dict], out_dir: Path, config: dict) -> None:
 # Orchestrator
 # ---------------------------------------------------------------------------
 
+def _archive_existing(out_dir: Path) -> Path | None:
+    """Before re-fetching a slug, move its existing copy aside instead of overwriting,
+    so we never lose a previous version. Destination:
+    <store>/.archive/<slug>@<old-engine>-<YYYYMMDD-HHMMSS>/. Returns the archive path,
+    or None if there was nothing to archive. Opt-in via --archive-existing (store
+    fetches set it; sandbox fetches do not)."""
+    idx = out_dir / "INDEX.md"
+    if not (idx.exists() or any(out_dir.glob("*.md"))):
+        return None
+    eng = "unknown"
+    if idx.exists():
+        m = re.search(r"Engine:\s*(\S+)", idx.read_text(encoding="utf-8", errors="replace"))
+        if m:
+            eng = m.group(1)
+    stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime(out_dir.stat().st_mtime))
+    archive_root = out_dir.parent / ".archive"
+    archive_root.mkdir(parents=True, exist_ok=True)
+    dest = archive_root / f"{out_dir.name}@{eng}-{stamp}"
+    i = 1
+    while dest.exists():
+        dest = archive_root / f"{out_dir.name}@{eng}-{stamp}_{i}"; i += 1
+    shutil.move(str(out_dir), str(dest))
+    print(f"[archive] previous {out_dir.name}/ -> .archive/{dest.name}/")
+    return dest
+
+
 def run(config: dict) -> int:
     out_dir = Path(config["out"])
+    if config.get("archive_existing") and out_dir.exists():
+        _archive_existing(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     strategy = config.get("strategy", "http")
     config["_provenance"] = {"engine": _engine_version(),
@@ -884,6 +912,9 @@ def main() -> int:
                         help="Clear cached HTML/clone before running")
     parser.add_argument("--keep-html", action="store_true",
                         help="Keep _raw_html/ cache after successful run (default: deleted to save disk)")
+    parser.add_argument("--archive-existing", action="store_true", dest="archive_existing",
+                        help="before writing, move an existing slug copy to .archive/ "
+                             "(never overwrite; store fetches should set this)")
     parser.add_argument("--raw", action="store_true",
                         help="Store fetched pages verbatim (skip the default deterministic 'min' compaction)")
     parser.add_argument("--list-presets", action="store_true",
@@ -1034,6 +1065,7 @@ def main() -> int:
 
     config["keep_html"] = args.keep_html
     config["compact_pages"] = not args.raw
+    config["archive_existing"] = args.archive_existing
     return run(config)
 
 

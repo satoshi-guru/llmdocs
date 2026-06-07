@@ -184,3 +184,31 @@ def test_write_page_applies_minify(tmp_path):
             "markdown": "line1\n\n\n\n\nline2", "filepath": fp, "depth": 0}
     L._write_page(page, out, minify=lambda s: s.replace("\n\n\n\n\n", "\n\n"))
     assert "\n\n\n\n" not in fp.read_text()
+
+
+# --- provenance stamping (B1) + archive-on-overwrite (B2) --------------------
+
+def test_write_page_stamps_provenance(tmp_path):
+    out = tmp_path / "o"; out.mkdir(); fp = out / "p.md"
+    page = {"url": "https://x.io/p", "title": "P", "markdown": "Body.",
+            "filepath": fp, "depth": 0}
+    L._write_page(page, out, minify=None,
+                  provenance={"engine": "abc123", "fetched_at": "2026-06-07"})
+    txt = fp.read_text()
+    assert "fetched_with: abc123" in txt and "fetched_at: 2026-06-07" in txt
+
+
+def test_archive_existing_moves_old_copy(tmp_path):
+    store = tmp_path / "docs"; slug = store / "lib"; slug.mkdir(parents=True)
+    (slug / "INDEX.md").write_text("# I\nEngine: oldsha  \nPages: 1\n")
+    (slug / "a.md").write_text("old")
+    dest = L._archive_existing(slug)
+    assert dest is not None and dest.exists()
+    assert "@oldsha-" in dest.name
+    assert (dest / "a.md").read_text() == "old"
+    assert not slug.exists()  # moved away, ready for a fresh write
+
+
+def test_archive_existing_noop_when_empty(tmp_path):
+    store = tmp_path / "docs"; slug = store / "lib"; slug.mkdir(parents=True)
+    assert L._archive_existing(slug) is None  # nothing to archive
