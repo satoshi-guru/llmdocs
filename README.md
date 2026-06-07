@@ -162,6 +162,7 @@ url: https://discord.com/developers/docs/interactions/application-commands
 ## Documentation
 
 - [Getting started](docs/getting-started.md)
+- [Consuming the output (the tier ladder)](docs/consuming.md)
 - [HTTP vs GitHub strategy](docs/strategies.md)
 - [Built-in presets](docs/presets.md)
 - [Adding a custom preset](docs/add-preset.md)
@@ -316,7 +317,7 @@ bash skills/install.sh
 ```
 
 Sets up the global store (`~/.llmdocs/docs/` + a `~/.claude/docs` symlink) and copies
-four skills to `~/.claude/skills/`:
+four skills to `~/.claude/skills/`, plus one agent to `~/.claude/agents/`:
 
 | Skill | What it does |
 |-------|-------------|
@@ -324,6 +325,11 @@ four skills to `~/.claude/skills/`:
 | `/docs-prime [lib1 lib2 ...]` | Full workflow: fetch → index → compile |
 | `/docs-context` | Compile `LIB-CONTEXT.md` from the store |
 | `/docs-distill [lib]` | Build `COMPACT.md` + `LOOKUP.md` for fast grep lookup |
+
+The agent — **`docs-context`** — is a pre-wave research agent: before a build, it reads the
+store and compiles a sprint `LIB-CONTEXT.md` of exact API patterns so builder agents don't
+hallucinate library syntax. See [Consuming the output](docs/consuming.md) for how the tiers
+feed agents.
 
 > **One-time permission grant.** Claude Code sandboxes `Write`/`Edit` to the current
 > project, so a session in repo X can't write to the store by default. Add the store to

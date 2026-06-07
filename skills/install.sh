@@ -67,10 +67,13 @@ echo "  /docs-context                 — compile LIB-CONTEXT.md from the store"
 echo "  /docs-distill [lib]           — build COMPACT.md for fast lookup"
 echo ""
 echo "IMPORTANT — one-time permission grant so EVERY repo's session can write"
-echo "to the store (otherwise Write/Edit is sandboxed to the current project):"
-echo "add this to ~/.claude/settings.json under \"permissions\":"
+echo "to the store (otherwise Write/Edit is sandboxed to the current project)."
+echo "Merge this \"permissions\" block into ~/.claude/settings.json (if the file is"
+echo "empty, wrap it in an outer { } to make valid JSON):"
 echo ""
-echo '    "additionalDirectories": ["'"$STORE_HOME"'", "'"$HOME"'/.claude/docs"]'
+echo '    "permissions": {'
+echo '      "additionalDirectories": ["'"$STORE_HOME"'", "'"$HOME"'/.claude/docs"]'
+echo '    }'
 echo ""
 echo "Store: $STORE_HOME/docs   ·   manifest: $STORE_HOME/MANIFEST.md"
 echo "Override the store location anywhere with \$LLMDOCS_HOME."
