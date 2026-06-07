@@ -11,6 +11,12 @@ signal. Always run the engines being compared on the **same URL simultaneously**
 so live site drift affects them equally (comparing a fresh crawl to a stored copy
 is invalid — sites change).
 
+> **Caveat — rate-limited sites:** running several engines on the same URL *at once*
+> can trip per-IP rate limits (e.g. MediaWiki wikis), making all engines return 0 —
+> a false negative, not an engine bug (this caused the bogus "nftables blocks
+> crawling" in #19). For such sites lower `--workers`, raise `--rate-limit`, or run
+> engines one at a time. The engine itself now retries 429/5xx with backoff (#31).
+
 ## Scripts
 
 ### `inventory.py`
