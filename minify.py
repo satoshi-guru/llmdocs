@@ -137,6 +137,13 @@ def densify(md_text):
     """Level `dense`: custom machine language. Code fences untouched."""
     text = minify(md_text)
 
+    # Pass a leading YAML frontmatter block through verbatim — its values are data,
+    # not prose, so emphasis/heading/table transforms must not touch them (B5).
+    front = ""
+    fm = re.match(r"---\n.*?\n---\n", text, re.DOTALL)
+    if fm:
+        front, text = fm.group(0), text[fm.end():]
+
     def prose(t):
         # Preserve whether the chunk ends with a newline — needed to keep the
         # separator between a heading tag and the following code fence opening,
@@ -162,7 +169,8 @@ def densify(md_text):
             t += "\n"
         return t
 
-    return _map_prose(text, prose).strip() + "\n"
+    body = _map_prose(text, prose).strip() + "\n"
+    return front + body if front else body
 
 
 # --- best-effort round-trip: `dense` -> Markdown ---------------------------

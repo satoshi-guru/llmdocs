@@ -216,6 +216,15 @@ def test_densify_keeps_yaml_frontmatter():
     assert "title: x" in out
 
 
+def test_densify_preserves_emphasis_inside_frontmatter():
+    # B5: dense's emphasis/heading stripping must not touch YAML frontmatter VALUES.
+    doc = '---\ntitle: "My **Bold** Title"\ndesc: use __init__ here\n---\n\nbody **x**\n'
+    out = minify.densify(doc)
+    assert "My **Bold** Title" in out      # frontmatter value verbatim
+    assert "__init__" in out               # underscores in frontmatter survive
+    assert "body x" in out                 # body emphasis IS still stripped (dense)
+
+
 def test_densify_drops_one_dash_table_separator():
     # A 1-dash hand-written separator must be dropped, not leaked as a CSV junk row.
     out = minify.densify("| a | b |\n| - | - |\n| 1 | 2 |\n")
