@@ -694,6 +694,7 @@ def phase1_github(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
                 out_path = out_path.with_suffix(".md")
 
             pages[fake_url] = {
+                "url": fake_url,   # _write_page reads data["url"]; github stored it only as the dict key
                 "title": title,
                 "markdown": text,
                 "filepath": out_path,
