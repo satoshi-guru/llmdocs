@@ -47,6 +47,37 @@ def test_minify_drops_html_comments():
     assert "nav cruft" not in out
 
 
+def test_minify_keeps_html_comments_in_indented_code():
+    # B1: the always-on `min` path must not strip <!-- --> from indented code.
+    src = "Example:\n\n    x = 1  # <!-- arrow --> in code\n    y = 2\n"
+    out = minify.minify(src)
+    assert "<!-- arrow -->" in out
+
+
+def test_minify_keeps_html_comments_in_inline_code():
+    # M1: same root cause must not gut inline `code` spans documenting comments.
+    src = "To hide content, wrap it: `<!-- hidden -->`. The renderer skips it.\n"
+    out = minify.minify(src)
+    assert "`<!-- hidden -->`" in out
+
+
+def test_minify_does_not_swallow_prose_across_a_multiline_comment():
+    # B1 multi-line variant: a DOTALL <!-- ... --> span must not eat real prose
+    # between the markers. We keep the comment intact rather than risk the swallow.
+    src = "para one <!-- open\nmiddle real prose line\nstill prose --> tail\n"
+    out = minify.minify(src)
+    assert "middle real prose line" in out
+
+
+def test_minify_keeps_trailing_ws_in_indented_code():
+    # M2: trailing whitespace can be content-significant inside indented code.
+    src = "text\n\n    line_with_trailing   \n    next\n"
+    out = minify.minify(src)
+    assert "    line_with_trailing   \n" in out
+    # ...but ordinary prose trailing whitespace is still trimmed.
+    assert minify.minify("body line  \n") == "body line\n"
+
+
 def test_minify_preserves_code_and_headings_and_tables():
     text = "## Keep\n\n```py\n\n\nx = 1\n\n\n```\n\n| a | b |\n| - | - |\n"
     out = minify.minify(text)

@@ -56,17 +56,46 @@ def _map_prose(text, fn):
 # --- level `min` -----------------------------------------------------------
 
 _HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-_TRAILING_WS = re.compile(r"[ \t]+$", re.MULTILINE)
 _BLANK_RUN = re.compile(r"\n{3,}")
+_INLINE_CODE = re.compile(r"`[^`]*`")
+
+
+def _is_indented_code(line: str) -> bool:
+    """True for a Markdown indented-code line (a tab, or >=4 spaces before the
+    first non-space). Such lines are code and must pass through verbatim."""
+    return line[:1] == "\t" or re.match(r" {4,}\S", line) is not None
+
+
+def _strip_html_comments(line: str) -> str:
+    """Drop HTML comments from one PROSE line, but never from inside an inline
+    `code` span — so docs that *document* `<!-- ... -->` keep their examples."""
+    if "`" not in line:
+        return _HTML_COMMENT.sub("", line)
+    parts = _INLINE_CODE.split(line)        # even idx = prose, odd = `code`
+    codes = _INLINE_CODE.findall(line)
+    parts = [_HTML_COMMENT.sub("", p) for p in parts]
+    out = parts[0]
+    for c, p in zip(codes, parts[1:]):
+        out += c + p
+    return out
 
 
 def minify(md_text):
-    """Level `min`: still-valid Markdown, smaller. Code fences untouched."""
+    """Level `min`: still-valid Markdown, smaller. Code fences untouched.
+
+    Operates line by line so indented code blocks and inline `code` spans are
+    never mutated: HTML-comment and trailing-whitespace stripping run only on
+    genuine prose. A multi-line HTML comment is left intact rather than risk a
+    DOTALL span swallowing code or real prose across a code/blank boundary.
+    """
     def prose(t):
-        t = _HTML_COMMENT.sub("", t)
-        t = _TRAILING_WS.sub("", t)
-        t = _BLANK_RUN.sub("\n\n", t)
-        return t
+        out = []
+        for line in t.split("\n"):
+            if _is_indented_code(line):
+                out.append(line)                          # code — verbatim
+            else:
+                out.append(_strip_html_comments(line).rstrip(" \t"))
+        return _BLANK_RUN.sub("\n\n", "\n".join(out))
 
     return _map_prose(md_text, prose).strip() + "\n"
 
@@ -79,15 +108,12 @@ _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$", re.MULTILINE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$")
 
 
-_INLINE_CODE = re.compile(r"`[^`]*`")
-
-
 def _strip_emphasis(line: str) -> str:
     """Remove bold/italic markers from a single PROSE line, but never inside an
     inline `code` span and never on an indented code block (>=4 leading spaces or a
     tab). Without this, dense ate underscores in code identifiers
     (`__name__` -> name, a__b__c -> abc) — code must survive verbatim."""
-    if line[:1] == "\t" or re.match(r" {4,}\S", line):
+    if _is_indented_code(line):
         return line  # indented code block — leave verbatim
     parts = _INLINE_CODE.split(line)        # even idx = prose, odd = `code`
     codes = _INLINE_CODE.findall(line)
