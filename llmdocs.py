@@ -671,14 +671,35 @@ def phase1_github(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
         print("  Done.")
 
     source_dir = clone_dir / docs_subdir
+    used_subdir = docs_subdir
     if not source_dir.exists():
-        source_dir = clone_dir
+        source_dir = clone_dir            # repo has no docs/ subdir -> read from root
+        used_subdir = ""
+
+    # Detect the default branch for accurate blob URLs (#30 — was hardcoded 'main').
+    branch = "main"
+    try:
+        r = subprocess.run(["git", "-C", str(clone_dir), "symbolic-ref", "--short", "HEAD"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip():
+            branch = r.stdout.strip()
+    except Exception:
+        pass
+
+    # Skip non-doc dirs so the root fallback doesn't ingest CI templates / test
+    # fixtures / examples as if they were docs (#29).
+    _SKIP_DIRS = {".git", ".github", "testdata", "test", "tests", "__tests__",
+                  "examples", "example", "node_modules", "vendor", "fixtures"}
 
     pages: dict[str, dict] = {}
+    skipped = 0
 
     for ext in extensions:
         for md_file in sorted(source_dir.rglob(f"*{ext}")):
             rel = md_file.relative_to(source_dir)
+            if _SKIP_DIRS.intersection(rel.parts[:-1]):
+                skipped += 1
+                continue
             text = md_file.read_text(encoding="utf-8", errors="replace")
 
             title_match = re.search(r"^#{1,2}\s+(.+)", text, re.MULTILINE)
@@ -688,7 +709,9 @@ def phase1_github(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
                 else md_file.stem.replace("-", " ").title()
             )
 
-            fake_url = f"{repo_url}/blob/main/{docs_subdir}/{str(rel).replace(chr(92), '/')}"
+            rel_str = str(rel).replace(chr(92), "/")
+            repo_path = f"{used_subdir}/{rel_str}" if used_subdir else rel_str
+            fake_url = f"{repo_url}/blob/{branch}/{repo_path}"
             out_path = out_dir / str(rel)
             if ext == ".mdx":
                 out_path = out_path.with_suffix(".md")
@@ -701,7 +724,8 @@ def phase1_github(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
                 "depth": len(rel.parts) - 1,
             }
 
-    print(f"[Phase 1] Done — {len(pages)} files found")
+    note = f" ({skipped} non-doc files skipped)" if skipped else ""
+    print(f"[Phase 1] Done — {len(pages)} files found{note}")
     return pages, []
 
 
