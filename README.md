@@ -217,10 +217,11 @@ cat ~/.llmdocs/MANIFEST.md         # see every library + page count
 ### Store dashboard
 
 `python -m scripts.store_index` (re)generates a one-row-per-library dashboard — tiers present
-(Raw/INDEX/COMPACT/LOOKUP), pages, raw vs COMPACT tokens, and the **measured reduction %** — into
-`~/.llmdocs/docs/INDEX.md`. It's **generated, so don't hand-edit it**; CI enforces freshness with
-`python -m scripts.store_index --check`. The `store/INDEX.md` committed in this repo is a small
-**example** built from `store/example/` — your live dashboard reflects your own store.
+(Raw/INDEX/COMPACT/LOOKUP), pages, raw vs COMPACT tokens, a **reduction bar + %**, and a totals
+row — into `~/.llmdocs/docs/INDEX.md`. It's **generated, so don't hand-edit it**; CI enforces
+freshness with `python -m scripts.store_index --check`. Add `--plain` for a leaner, bar-free table
+(~7 tok/row cheaper to read). The `store/INDEX.md` committed in this repo is a small **example**
+built from `store/example/` — your live dashboard reflects your own store.
 
 ### Store doctor
 
