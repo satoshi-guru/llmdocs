@@ -36,7 +36,7 @@ then writes **correct, version-pinned** code from it: no guessing stale-training
 no fanning out search agents, no run → error → investigate → fix loop.
 
 **No server, no account, no API key, no quota.** The tiers are plain files on your machine —
-`grep LOOKUP.md` (~30 tokens) and `/lib-context` (reads `COMPACT.md`) deliver the savings
+`grep LOOKUP.md` (~30 tokens) and `/docs-context` (reads `COMPACT.md`) deliver the savings
 **today**. A future MCP server is just a tidier doorway to the same files — an optional
 convenience, never a prerequisite.
 
@@ -46,6 +46,19 @@ convenience, never a prerequisite.
 ---
 
 ## How it works
+
+**Three verbs over one local doc store** — and the split is also a *no-LLM / LLM* boundary,
+which is why the same store serves a plain Python/MCP client and a Claude Code session equally:
+
+| Verb | What it does | Needs an LLM? | Command |
+|------|--------------|:-------------:|---------|
+| **FETCH**   | crawl a docs site → markdown in the store | no | `/docs-fetch` (engine: `crawler.py`) |
+| **DISTILL** | raw pages → the cheap tiers (`LOOKUP.md` grep, `COMPACT.md` read) | yes | `/docs-distill` |
+| **READ**    | answer from the store, cheapest tier first | no, to serve | `/docs-context` · grep · *(MCP `docs-server`, planned)* |
+
+`/docs-prime` runs all three for a sprint in one command. Because **READ** is plain file reads,
+a planned stdio **MCP server** (`lookup`/`read`/`page`/`list`) can expose the store to *any*
+agent framework — no Claude required on either side. The fetch pipeline in detail:
 
 ```
 1. Fetch    HTTP crawl  or  git clone (for JS/SPA sites)
@@ -172,7 +185,7 @@ repo — never siloed per project.
 
 Principles:
 
-- **Global, not per-project.** `/llmdoc expo` from any repo writes to `~/.llmdocs/docs/expo/`.
+- **Global, not per-project.** `/docs-fetch expo` from any repo writes to `~/.llmdocs/docs/expo/`.
   Resolution is global-only — projects no longer keep their own `./docs/`.
 - **Append-only.** New fetches *add* to the store; nothing is ever replaced. Versions don't
   matter — the point is to know *everything* about what we use, so findings accumulate.
@@ -211,7 +224,7 @@ git sha). Use `--archive-existing` to **never overwrite** a slug: before writing
 existing copy is moved to `<store>/.archive/<slug>@<old-engine>-<timestamp>/`, so
 older versions are kept for cross-version comparison. The canonical path
 `~/.llmdocs/docs/<slug>/` always holds the current copy (skills read it unchanged);
-store-targeted fetches (via `/llmdoc`) should pass `--archive-existing`.
+store-targeted fetches (via `/docs-fetch`) should pass `--archive-existing`.
 
 > Skills run from your project dir, so they locate the engine via **`$LLMDOCS_DIR`** (your clone),
 > set by `skills/install.sh`. The store path is **`$LLMDOCS_HOME`** (default `~/.llmdocs`); the
@@ -219,21 +232,21 @@ store-targeted fetches (via `/llmdoc`) should pass `--archive-existing`.
 
 ---
 
-## doc-prime — Claude Code Workflow
+## docs-prime — Claude Code Workflow
 
-llmdocs is the fetcher. The **doc-prime workflow** wraps it with Claude Code skills
+llmdocs is the fetcher. The **docs-prime workflow** wraps it with Claude Code skills
 that turn raw pages into ultra-compact references builders can consume in seconds.
 
 ```
-/doc-prime expo supabase-js     ← fetch + index + compile in one command
+/docs-prime expo supabase-js     ← fetch + index + compile in one command
 ```
 
-Always in this order — **index before compile**, because `lib-context` *consumes* `COMPACT.md`:
+Always in this order — **index before compile**, because `docs-context` *consumes* `COMPACT.md`:
 
 ```
 1. crawler.py    fetch docs → ~/.llmdocs/docs/<lib>/                    (this tool, no LLM)
-2. doc-indexer   index   → ~/.llmdocs/docs/<lib>/COMPACT.md + LOOKUP.md (the cheap tiers)
-3. lib-context   compile → LIB-CONTEXT.md  (sprint summary, reads COMPACT.md)
+2. docs-distill   index   → ~/.llmdocs/docs/<lib>/COMPACT.md + LOOKUP.md (the cheap tiers)
+3. docs-context   compile → LIB-CONTEXT.md  (sprint summary, reads COMPACT.md)
 4. store_index   refresh → ~/.llmdocs/docs/INDEX.md  (the dashboard)
 ```
 
@@ -277,7 +290,7 @@ with no hallucinated API syntax.
 ### Deterministic compaction (no LLM): `--compact`
 
 `COMPACT.md` above is an LLM *summary*. For a fast, free, **complete** shrink with no model in
-the loop, `compact.py` provides two deterministic levels — **code samples are preserved
+the loop, `minify.py` provides two deterministic levels — **code samples are preserved
 byte-for-byte** (the bug the original ad-hoc compiler had):
 
 ```bash
@@ -307,10 +320,10 @@ four skills to `~/.claude/skills/`:
 
 | Skill | What it does |
 |-------|-------------|
-| `/llmdoc [lib \| url]` | Fetch docs into the global store |
-| `/doc-prime [lib1 lib2 ...]` | Full workflow: fetch → index → compile |
-| `/lib-context` | Compile `LIB-CONTEXT.md` from the store |
-| `/doc-indexer [lib]` | Build `COMPACT.md` + `LOOKUP.md` for fast grep lookup |
+| `/docs-fetch [lib \| url]` | Fetch docs into the global store |
+| `/docs-prime [lib1 lib2 ...]` | Full workflow: fetch → index → compile |
+| `/docs-context` | Compile `LIB-CONTEXT.md` from the store |
+| `/docs-distill [lib]` | Build `COMPACT.md` + `LOOKUP.md` for fast grep lookup |
 
 > **One-time permission grant.** Claude Code sandboxes `Write`/`Edit` to the current
 > project, so a session in repo X can't write to the store by default. Add the store to
@@ -322,8 +335,8 @@ four skills to `~/.claude/skills/`:
 
 ### Per-project setup
 
-After installing skills, add your project's library aliases to `skills/llmdoc/SKILL.md`
-(the alias tables) and group them in `skills/llmdoc/PRESETS.md`:
+After installing skills, add your project's library aliases to `skills/docs-fetch/SKILL.md`
+(the alias tables) and group them in `skills/docs-fetch/PRESETS.md`:
 
 ```markdown
 | expo          | https://docs.expo.dev                                      |
@@ -335,14 +348,14 @@ After installing skills, add your project's library aliases to `skills/llmdoc/SK
 
 ```bash
 # 1. Before coding — prime context
-/doc-prime expo supabase-js
+/docs-prime expo supabase-js
 
 # 2. During sprint — instant lookup (1–2 tokens, no file read)
 grep "getExpoPushToken" ~/.llmdocs/docs/LOOKUP.md
 
 # 3. If library upgraded — refresh
-/doc-prime expo --no-cache
-/doc-indexer expo
+/docs-prime expo --no-cache
+/docs-distill expo
 ```
 
 ### Important: fetch timeout

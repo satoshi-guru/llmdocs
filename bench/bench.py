@@ -128,7 +128,7 @@ def bench_lib(lib: str, store: Path) -> dict:
     lookup_lines = golden.get("lookup", [])
 
     if not lib_dir.is_dir():
-        raise SystemExit(f"lib not in store: {lib_dir} — run /llmdoc {lib} first")
+        raise SystemExit(f"lib not in store: {lib_dir} — run /docs-fetch {lib} first")
 
     full_raw = _full_raw_tokens(lib_dir)
     rows = []
@@ -206,7 +206,7 @@ def write_report(results: list[dict], out: Path) -> None:
         winner = next((s for s in STRATEGIES if qualifies(s)), None)  # cheap → rich
         if winner:
             lines += [
-                f"**Read tier (wire as doc-indexer default): `{winner}`** — cheapest strategy "
+                f"**Read tier (wire as docs-distill default): `{winner}`** — cheapest strategy "
                 f"that passes the recall gate *and* scores ≥{JUDGE_MIN*100:.0f}% on the "
                 "LLM-judge for every benchmarked library (reliably answers usage questions, "
                 "not just signature presence).",
@@ -227,7 +227,7 @@ def write_report(results: list[dict], out: Path) -> None:
             "being usable. Principled split pending judge confirmation:")
         lines += [
             "",
-            "- **Read tier (wire as doc-indexer default):** `compact` — full recall with usage "
+            "- **Read tier (wire as docs-distill default):** `compact` — full recall with usage "
             "patterns, ~99%+ reduction.",
             "- **Grep tier (existence / signature lookup):** `lookup_only` — ~99.9% reduction, "
             "answers \"does this API exist / what's its signature\" in 1–2 tokens.",

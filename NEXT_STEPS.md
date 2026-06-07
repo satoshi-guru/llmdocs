@@ -8,7 +8,7 @@ A #14 incremental writes ─┐
 B #16 provenance/version ─┼─► D #15 store cleanup (prune + re-fetch) ─► (store clean)
 C1 #17 github strategy  ──┤
 C2 #19 blocked sites    ──┘
-A,B,C ──► E #18 publish doc-prime + lib-context   (store cleanup not required for publish)
+A,B,C ──► E #18 publish docs-prime + docs-context   (store cleanup not required for publish)
 ```
 
 Rules in force: never work on main; one branch per task → tests → PR → rebase-merge
@@ -136,9 +136,9 @@ backup exists.
 
 ---
 
-## Phase E — #18 Publish doc-prime + lib-context — NEEDS GO
+## Phase E — #18 Publish docs-prime + docs-context — NEEDS GO
 
-**Goal:** the original task — make doc-prime + lib-context public.
+**Goal:** the original task — make docs-prime + docs-context public.
 **Depends on:** A,B,C complete (solid engine). Store cleanup (D) recommended but not
 required (the store is local data, not published).
 **Branch:** `chore/publish-prep`
@@ -147,7 +147,7 @@ required (the store is local data, not published).
 1. Decide scope/repo: publish `llmdocs` itself, or a clean public mirror;
    choose a license; confirm with user.
 2. De-personalization audit: grep for private paths/hosts/tokens; scrub.
-3. Ensure skills (doc-prime, llmdoc, lib-context, doc-indexer) + install.sh are
+3. Ensure skills (docs-prime, docs-fetch, docs-context, docs-distill) + install.sh are
    included and documented for external users.
 4. Quickstart README for outsiders.
 5. Make public (explicit user action). Verify with `gh repo view`.

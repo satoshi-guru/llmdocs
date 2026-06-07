@@ -33,9 +33,9 @@ fi
 
 # 2. Skills.
 echo "Installing llmdocs Claude Code skills to $SKILLS_DIR..."
-for skill in llmdoc doc-prime lib-context doc-indexer; do
+for skill in docs-fetch docs-prime docs-context docs-distill; do
   mkdir -p "$SKILLS_DIR/$skill"
-  # copy SKILL.md + any sibling files (e.g. llmdoc/PRESETS.md)
+  # copy SKILL.md + any sibling files (e.g. docs-fetch/PRESETS.md)
   if ! ls "$SCRIPT_DIR/$skill"/*.md >/dev/null 2>&1; then
     echo "  ⚠ $skill: no .md files found in $SCRIPT_DIR/$skill — skipping" >&2
     continue
@@ -61,10 +61,10 @@ fi
 
 echo ""
 echo "Done. Skills available in Claude Code:"
-echo "  /llmdoc [lib | url]          — fetch docs into the global store"
-echo "  /doc-prime [lib1 lib2 ...]   — fetch → compile → index"
-echo "  /lib-context                 — compile LIB-CONTEXT.md from the store"
-echo "  /doc-indexer [lib]           — build COMPACT.md for fast lookup"
+echo "  /docs-fetch [lib | url]          — fetch docs into the global store"
+echo "  /docs-prime [lib1 lib2 ...]   — fetch → compile → index"
+echo "  /docs-context                 — compile LIB-CONTEXT.md from the store"
+echo "  /docs-distill [lib]           — build COMPACT.md for fast lookup"
 echo ""
 echo "IMPORTANT — one-time permission grant so EVERY repo's session can write"
 echo "to the store (otherwise Write/Edit is sandboxed to the current project):"

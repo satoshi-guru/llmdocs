@@ -1,18 +1,18 @@
 ---
-name: lib-context
+name: docs-context
 description: Builds a LIB-CONTEXT.md for a sprint by reading locally fetched library docs (~/.llmdocs/docs/<library>/) and extracting exact API patterns, version-specific syntax, and common mistakes. Prevents builder agents from hallucinating library API syntax. Run before any builder wave.
 allowed-tools: Bash Read Write
 ---
 
 # Library Context Builder
 
-Reads locally available docs (fetched by `/llmdoc`) and compiles exact API patterns into a single context file that builders consume. No network access — all docs come from the **global store** `~/.llmdocs/docs/` (symlinked at `~/.claude/docs/`), shared across every repo. Resolution is **global-only**: a library lives in the store or it doesn't; projects don't keep their own `./docs/` copies. Versions don't matter — the store accumulates everything we know about a library, and new fetches add to it.
+Reads locally available docs (fetched by `/docs-fetch`) and compiles exact API patterns into a single context file that builders consume. No network access — all docs come from the **global store** `~/.llmdocs/docs/` (symlinked at `~/.claude/docs/`), shared across every repo. Resolution is **global-only**: a library lives in the store or it doesn't; projects don't keep their own `./docs/` copies. Versions don't matter — the store accumulates everything we know about a library, and new fetches add to it.
 
 ---
 
 ## Step 0: Check for COMPACT.md index files (fast path)
 
-Before reading any raw docs, check if `/doc-indexer` has already processed them:
+Before reading any raw docs, check if `/docs-distill` has already processed them:
 
 ```bash
 ls ~/.llmdocs/docs/*/COMPACT.md 2>/dev/null
@@ -26,7 +26,7 @@ COMPACT.md is ~80–120 lines and replaces reading hundreds of raw pages — a m
 99.8–99.97% token reduction (see `bench/REPORT.md`).
 
 If no COMPACT.md exists for a library → proceed to Step 2 (read raw docs).
-After writing LIB-CONTEXT.md, suggest: "Run `/doc-indexer <lib>` to create COMPACT.md for next time."
+After writing LIB-CONTEXT.md, suggest: "Run `/docs-distill <lib>` to create COMPACT.md for next time."
 
 ---
 
@@ -142,8 +142,8 @@ Source: ~/.llmdocs/docs/<library>/
 
 This skill does **not** carry hardcoded API snippets. It is a *consumer* of the doc
 store: read `COMPACT.md` (Step 0) when present, otherwise the raw docs (Step 2). If a
-library is missing from `~/.llmdocs/docs/`, **fetch it first** with `/llmdoc <library>`
-and `/doc-indexer <library>` — never guess the API from memory.
+library is missing from `~/.llmdocs/docs/`, **fetch it first** with `/docs-fetch <library>`
+and `/docs-distill <library>` — never guess the API from memory.
 
 ---
 
@@ -153,7 +153,7 @@ If a library's docs are not in `~/.llmdocs/docs/<library>/`, add to LIB-CONTEXT.
 
 ```
 ⚠ ~/.llmdocs/docs/<library>/ not found — no patterns emitted for this library.
-Run `/llmdoc <library>` (then `/doc-indexer <library>`) to fetch current docs, and re-run.
+Run `/docs-fetch <library>` (then `/docs-distill <library>`) to fetch current docs, and re-run.
 ```
 
 After writing LIB-CONTEXT.md, report:
@@ -161,5 +161,5 @@ After writing LIB-CONTEXT.md, report:
 LIB-CONTEXT.md written to {SPRINT_DIR or ./}LIB-CONTEXT.md
 Libraries covered (from ~/.llmdocs/docs/): {list}
 Missing (not in store — no patterns emitted): {list or "none"}
-Fetch to fix: /llmdoc {library} for each missing
+Fetch to fix: /docs-fetch {library} for each missing
 ```

@@ -3,7 +3,7 @@
 
 The global lookup table lives at $LLMDOCS_HOME/docs/LOOKUP.md (default
 ~/.llmdocs/docs/LOOKUP.md) — one `lib | signature | note` line per API, shared by
-every repo. `doc-indexer` emits a fresh block of lines for a library; this script
+every repo. `docs-distill` emits a fresh block of lines for a library; this script
 does the mechanical append: drop that library's existing lines, add the new ones,
 keep the file sorted by library name. The store stays append-only — other
 libraries' lines are never touched.

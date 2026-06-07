@@ -4,4 +4,4 @@ lxml>=5.0
 requests>=2.31.0
 
 # Dev/test deps are in requirements-dev.txt (pip install -r requirements-dev.txt)
-# The deterministic compactor (compact.py) is stdlib-only — no runtime deps.
+# The deterministic compactor (minify.py) is stdlib-only — no runtime deps.

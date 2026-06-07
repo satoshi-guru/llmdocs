@@ -234,9 +234,9 @@ PRESETS: dict[str, dict] = {
         "content_selectors": ["article", "main", "[class*='content']"],
         "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']"],
         # Prefix is "/en" (not "/en/docs") so the crawl also reaches the API
-        # reference under /en/api — the coverage the old llmdoc `anthropic` alias
+        # reference under /en/api — the coverage the old docs-fetch `anthropic` alias
         # (which pointed at /en/api/) provided. Capped at max_pages so the wider
-        # prefix can't run away. Keeps `/llmdoc anthropic` comprehensive.
+        # prefix can't run away. Keeps `/docs-fetch anthropic` comprehensive.
         "path_prefix": "/en",
         "max_depth": 5,
         "max_pages": 300,
@@ -578,8 +578,8 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[list[dict], list[dict]]:
     # handler turns an interrupt into a graceful stop that still writes the INDEX. (#14)
     minify = None
     if config.get("compact_pages", True):
-        import compact as _compact
-        minify = _compact.minify
+        import minify as _minify
+        minify = _minify.minify
     _stop = {"flag": False}
     def _on_stop(_signum, _frame):
         _stop["flag"] = True
@@ -801,8 +801,8 @@ def phase4_write(sorted_pages: list[tuple[str, dict]], out_dir: Path,
           f"{' (deterministic min compaction)' if compact_pages else ' (raw)'}...")
     minify = None
     if compact_pages:
-        import compact as _compact
-        minify = _compact.minify
+        import minify as _minify
+        minify = _minify.minify
     index_entries = []
     for _file_key_unused, data in sorted_pages:
         entry = _write_page(data, out_dir, minify, provenance)
@@ -966,7 +966,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.compact or args.expand or args.check:
-        import compact as _compact
+        import minify as _minify
 
         RESERVED = {"INDEX.md", "COMPACT.md", "LOOKUP.md"}
 
@@ -980,7 +980,7 @@ def main() -> int:
                     if f.name.endswith(".min.md"):
                         continue  # skip any stray .min.md inputs
                     text = f.read_text(encoding="utf-8")
-                    if _compact.minify(text) != text:
+                    if _minify.minify(text) != text:
                         print(f"DRIFT: {f} is not min-normalised "
                               f"(run --compact min in place)", file=sys.stderr)
                         failed = True
@@ -990,8 +990,8 @@ def main() -> int:
 
         def _transform(text: str) -> str:
             if args.expand:
-                return _compact.expand(text)
-            return _compact.minify(text) if args.compact == "min" else _compact.densify(text)
+                return _minify.expand(text)
+            return _minify.minify(text) if args.compact == "min" else _minify.densify(text)
 
         def _suffix() -> str:
             return ".md" if args.expand else f".{args.compact}.md"
@@ -1079,7 +1079,7 @@ def main() -> int:
         # unpredictable "discord-developer-docs"). _slug() still sanitises/lowers
         # the basename, so the --url path (out = "output/<domain>") keeps its
         # prior behaviour. This makes the store slug equal to the token the user
-        # typed, so /llmdoc and doc-prime can find it again.
+        # typed, so /docs-fetch and docs-prime can find it again.
         config["out"] = str(LLMDOCS_STORE / _slug(Path(config["out"]).name))
     if args.max_depth:
         config["max_depth"] = args.max_depth

@@ -23,7 +23,7 @@ RAW_HEAD_BUDGET = 12_000
 
 
 def _raw_pages(lib_dir: Path) -> list[Path]:
-    """Content pages, largest first (doc-indexer's content-rich heuristic)."""
+    """Content pages, largest first (docs-distill's content-rich heuristic)."""
     pages = [p for p in lib_dir.rglob("*.md")
              if p.name not in _NON_RAW and "_raw_html" not in p.parts]
     return sorted(pages, key=lambda p: p.stat().st_size, reverse=True)

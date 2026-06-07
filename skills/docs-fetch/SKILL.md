@@ -1,6 +1,6 @@
 ---
-name: llmdoc
-description: Fetch the docs for a specific library, framework, or URL and save them as LLM-ready markdown in the GLOBAL store (~/.llmdocs/docs/<slug>/), shared by every repo. Use whenever the user wants to grab, pull, mirror, save, or refresh docs for a named library/API — e.g. "grab the supabase-js docs", "fetch the discord developer docs", "pull httpx before I refactor". Always use BEFORE writing config or code against an unfamiliar or recently-changed library API, and immediately when a first install/build/run attempt fails — don't guess or retry with workarounds first. Routes engine presets (Discord SPA, Hyperliquid, etc.) via --preset. This is the quick single-library/single-URL fetch; for full pre-sprint prep across several libraries use /doc-prime.
+name: docs-fetch
+description: Fetch the docs for a specific library, framework, or URL and save them as LLM-ready markdown in the GLOBAL store (~/.llmdocs/docs/<slug>/), shared by every repo. Use whenever the user wants to grab, pull, mirror, save, or refresh docs for a named library/API — e.g. "grab the supabase-js docs", "fetch the discord developer docs", "pull httpx before I refactor". Always use BEFORE writing config or code against an unfamiliar or recently-changed library API, and immediately when a first install/build/run attempt fails — don't guess or retry with workarounds first. Routes engine presets (Discord SPA, Hyperliquid, etc.) via --preset. This is the quick single-library/single-URL fetch; for full pre-sprint prep across several libraries use /docs-prime.
 argument-hint: "[alias | <url>] — see presets table below"
 allowed-tools: Bash Read WebFetch WebSearch
 ---
@@ -93,13 +93,13 @@ For any alias not listed above, treat it as a raw URL.
 
 For one-command per-project refresh, use `preset:<group>`. Groups live in `PRESETS.md` under **Project Preset Groups** — they expand to a list of aliases.
 
-Combine groups with `+` for cross-stack tasks: `/llmdoc preset:web-frontend+python-api`. Libs are deduped before fetching.
+Combine groups with `+` for cross-stack tasks: `/docs-fetch preset:web-frontend+python-api`. Libs are deduped before fetching.
 
 Examples:
-- `/llmdoc preset:web-frontend` — full frontend doc refresh (react-native + tailwind + typescript + zod)
-- `/llmdoc preset:python-api` — full Python API stack (fastapi + pydantic + httpx + pytest)
-- `/llmdoc preset:web-frontend+python-api` — fusion for a full-stack sprint
-- `/llmdoc expo supabase` — ad-hoc, no preset group
+- `/docs-fetch preset:web-frontend` — full frontend doc refresh (react-native + tailwind + typescript + zod)
+- `/docs-fetch preset:python-api` — full Python API stack (fastapi + pydantic + httpx + pytest)
+- `/docs-fetch preset:web-frontend+python-api` — fusion for a full-stack sprint
+- `/docs-fetch expo supabase` — ad-hoc, no preset group
 
 ## Task
 
@@ -153,7 +153,7 @@ which repo you run from. **Never** write docs into the current project's `./docs
 
 4. Run targets sequentially (each fetch is network-bound).
 5. After each fetch: report target, pages written, output path, any errors.
-6. **After ALL fetches succeed, auto-chain `/doc-indexer`** for every freshly-fetched lib. This builds the `COMPACT.md` token-cheap layer (~900–1,300 tokens vs millions of raw — a measured 99.8–99.97% reduction, see `bench/REPORT.md`) that downstream sessions read by default. Never skip this step — the indexed layer is the point of the workflow.
+6. **After ALL fetches succeed, auto-chain `/docs-distill`** for every freshly-fetched lib. This builds the `COMPACT.md` token-cheap layer (~900–1,300 tokens vs millions of raw — a measured 99.8–99.97% reduction, see `bench/REPORT.md`) that downstream sessions read by default. Never skip this step — the indexed layer is the point of the workflow.
 7. **Refresh the store manifest** so what we've gathered stays tracked:
    ```bash
    (cd "$LLMDOCS_DIR" && python -m scripts.manifest)

@@ -1,17 +1,17 @@
-import compact  # noqa: F401
+import minify  # noqa: F401
 
 
 def test_module_importable():
-    assert hasattr(compact, "minify")
-    assert hasattr(compact, "densify")
-    assert hasattr(compact, "expand")
+    assert hasattr(minify, "minify")
+    assert hasattr(minify, "densify")
+    assert hasattr(minify, "expand")
 
 
 # --- fence-safe splitting (the critical correctness primitive) ---
 
 def test_split_keeps_code_fence_verbatim():
     text = "Use **bold**.\n\n```py\nx = a ** b  # ** stays\n```\n\nDone.\n"
-    chunks = list(compact._split_on_fences(text))
+    chunks = list(minify._split_on_fences(text))
     code = [c for is_code, c in chunks if is_code]
     prose = [c for is_code, c in chunks if not is_code]
     assert len(code) == 1
@@ -21,13 +21,13 @@ def test_split_keeps_code_fence_verbatim():
 
 def test_split_handles_tilde_fences_and_lang():
     text = "~~~bash\necho hi\n~~~\n"
-    chunks = list(compact._split_on_fences(text))
+    chunks = list(minify._split_on_fences(text))
     assert len(chunks) == 1 and chunks[0][0] is True
 
 
 def test_map_prose_skips_code():
     text = "a\n```\nKEEP a\n```\n"
-    out = compact._map_prose(text, lambda t: t.replace("a", "Z"))
+    out = minify._map_prose(text, lambda t: t.replace("a", "Z"))
     assert "KEEP a" in out      # code untouched
     assert out.startswith("Z")  # prose changed
 
@@ -36,20 +36,20 @@ def test_map_prose_skips_code():
 
 def test_minify_collapses_blank_runs_and_trailing_ws():
     text = "# Title   \n\n\n\nbody line  \n\n\n"
-    out = compact.minify(text)
+    out = minify.minify(text)
     assert "\n\n\n" not in out          # no 3+ newline runs
     assert "Title\n" in out             # trailing spaces trimmed
     assert out.endswith("\n")           # single trailing newline
 
 
 def test_minify_drops_html_comments():
-    out = compact.minify("a\n<!-- nav cruft -->\nb\n")
+    out = minify.minify("a\n<!-- nav cruft -->\nb\n")
     assert "nav cruft" not in out
 
 
 def test_minify_preserves_code_and_headings_and_tables():
     text = "## Keep\n\n```py\n\n\nx = 1\n\n\n```\n\n| a | b |\n| - | - |\n"
-    out = compact.minify(text)
+    out = minify.minify(text)
     assert "## Keep" in out                         # heading level preserved
     assert "x = 1" in out and "\n\n\nx = 1" in out   # blank lines INSIDE code kept
     assert "| a | b |" in out                       # table preserved
@@ -57,31 +57,31 @@ def test_minify_preserves_code_and_headings_and_tables():
 
 def test_minify_is_idempotent():
     text = "# T\n\n\nbody\n\n"
-    assert compact.minify(compact.minify(text)) == compact.minify(text)
+    assert minify.minify(minify.minify(text)) == minify.minify(text)
 
 
 # --- densify (level dense) ---
 
 def test_densify_headings_become_depth_tags():
-    assert "[2|Auth]" in compact.densify("## Auth\n")
-    assert "[4|Deep]" in compact.densify("#### Deep\n")
+    assert "[2|Auth]" in minify.densify("## Auth\n")
+    assert "[4|Deep]" in minify.densify("#### Deep\n")
 
 
 def test_densify_tables_become_csv():
-    out = compact.densify("| k | v |\n| - | - |\n| a | 1 |\n")
+    out = minify.densify("| k | v |\n| - | - |\n| a | 1 |\n")
     assert "k,v" in out
     assert "a,1" in out
     assert "---" not in out          # separator row dropped
 
 
 def test_densify_strips_emphasis_in_prose():
-    out = compact.densify("Use **Bearer** and _scopes_.\n")
+    out = minify.densify("Use **Bearer** and _scopes_.\n")
     assert "Bearer" in out and "**" not in out and "_scopes_" not in out
 
 
 def test_densify_preserves_code_fences_verbatim():
     text = "## H\n\n```py\na, b = 1, 2\nx = a ** b\n```\n"
-    out = compact.densify(text)
+    out = minify.densify(text)
     assert "a, b = 1, 2" in out       # NOT turned into CSV
     assert "x = a ** b" in out        # ** not stripped inside code
 
@@ -89,11 +89,11 @@ def test_densify_preserves_code_fences_verbatim():
 # --- expand (best-effort dense -> markdown) ---
 
 def test_expand_restores_headings():
-    assert "## Auth" in compact.expand("[2|Auth]\n")
+    assert "## Auth" in minify.expand("[2|Auth]\n")
 
 
 def test_expand_restores_table_from_csv():
-    out = compact.expand("k,v\na,1\n")
+    out = minify.expand("k,v\na,1\n")
     assert "| k | v |" in out
     assert "| --- | --- |" in out
     assert "| a | 1 |" in out
@@ -101,13 +101,13 @@ def test_expand_restores_table_from_csv():
 
 def test_dense_then_expand_recovers_heading_and_table_text():
     src = "## Params\n\n| name | type |\n| - | - |\n| id | int |\n"
-    recovered = compact.expand(compact.densify(src))
+    recovered = minify.expand(minify.densify(src))
     assert "## Params" in recovered
     assert "| name | type |" in recovered
     assert "| id | int |" in recovered
 
 
-# --- fidelity-grade compaction tests (First Principle) ----------------------
+# --- fidelity-grade minifyion tests (First Principle) ----------------------
 #
 # Composite doc with collapsible blank runs + trailing ws + an HTML comment so
 # `min` has real work to do, PLUS a multi-signature code block + table whose
@@ -146,24 +146,24 @@ _HEADINGS = ("# mylib", "## install")
 
 
 def test_min_reduces_size():
-    out = compact.minify(COMPOSITE)
+    out = minify.minify(COMPOSITE)
     assert len(out) < len(COMPOSITE), "min must shrink a doc with collapsible blanks/comments"
 
 
 def test_min_preserves_every_function_signature():
-    out = compact.minify(COMPOSITE)
+    out = minify.minify(COMPOSITE)
     for sig in _SIGNATURES:
         assert sig in out, f"min dropped a signature: {sig}"
 
 
 def test_min_preserves_section_headings():
-    out = compact.minify(COMPOSITE)
+    out = minify.minify(COMPOSITE)
     for h in _HEADINGS:
         assert h in out, f"min dropped a heading (overview structure): {h}"
 
 
 def test_dense_reduces_size_but_keeps_signatures():
-    out = compact.densify(COMPOSITE)
+    out = minify.densify(COMPOSITE)
     assert len(out) < len(COMPOSITE), "dense must shrink the composite doc"
     for sig in _SIGNATURES:
         assert sig in out, f"dense dropped a signature: {sig}"
@@ -171,7 +171,7 @@ def test_dense_reduces_size_but_keeps_signatures():
 
 def test_dense_preserves_headings_as_reachable_tags():
     # dense rewrites '## install' -> '[2|install]'; the title text must remain reachable.
-    out = compact.densify(COMPOSITE)
+    out = minify.densify(COMPOSITE)
     assert "[1|mylib]" in out, "dense dropped the top-level heading title"
     assert "[2|install]" in out, "dense dropped the install heading title"
 
@@ -180,14 +180,14 @@ def test_dense_preserves_headings_as_reachable_tags():
 
 def test_densify_keeps_yaml_frontmatter():
     doc = "---\ntitle: x\n---\n\n# H\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n"
-    out = compact.densify(doc)
+    out = minify.densify(doc)
     assert out.startswith("---"), "densify must not eat the YAML frontmatter delimiter"
     assert "title: x" in out
 
 
 def test_densify_drops_one_dash_table_separator():
     # A 1-dash hand-written separator must be dropped, not leaked as a CSV junk row.
-    out = compact.densify("| a | b |\n| - | - |\n| 1 | 2 |\n")
+    out = minify.densify("| a | b |\n| - | - |\n| 1 | 2 |\n")
     assert "a,b" in out and "1,2" in out
     assert "-,-" not in out and "- | -" not in out
 
@@ -198,21 +198,21 @@ def test_split_unclosed_fence_at_eof_is_code():
     # An unclosed fence running to EOF must be treated as CODE, not prose,
     # or densify/minify will corrupt the code lines inside it.
     text = "```py\na, b = 1, 2\n## not a heading\n"
-    chunks = list(compact._split_on_fences(text))
+    chunks = list(minify._split_on_fences(text))
     code = [c for is_code, c in chunks if is_code]
     assert any("a, b = 1, 2" in c for c in code), "unclosed fence at EOF lost its code chunk"
 
 
 def test_densify_does_not_corrupt_unclosed_fence_at_eof():
     text = "```py\na, b = 1, 2\n## not a heading\n"
-    out = compact.densify(text)
+    out = minify.densify(text)
     assert "a, b = 1, 2" in out          # NOT turned into a CSV row
     assert "[2|not a heading]" not in out # NOT heading-tagged inside code
 
 
 def test_split_fence_closed_at_eof_no_trailing_newline():
     text = "```\ncode2 = 2\n```"          # closing fence is the last byte
-    chunks = list(compact._split_on_fences(text))
+    chunks = list(minify._split_on_fences(text))
     assert len(chunks) == 1 and chunks[0][0] is True
     assert "code2 = 2" in chunks[0][1]
 
@@ -221,7 +221,7 @@ def test_split_fence_closed_at_eof_no_trailing_newline():
 
 def test_dense_expand_roundtrip_preserves_code_fence():
     src = "## H\n\n```py\nrow = a, b, c   # comma line inside code\n```\n\n| x | y |\n| - | - |\n| 1 | 2 |\n"
-    recovered = compact.expand(compact.densify(src))
+    recovered = minify.expand(minify.densify(src))
     assert "row = a, b, c   # comma line inside code" in recovered, "code comma-line got table-parsed"
     assert "## H" in recovered
 
@@ -229,13 +229,13 @@ def test_dense_expand_roundtrip_preserves_code_fence():
 def test_dense_preserves_code_identifiers():
     """dense must not eat underscores in inline code, indented code, or intra-word
     spans (regression: __name__ -> name corrupted code)."""
-    import compact
+    import minify
     src = ("See `__name__` and the guard:\n\n"
            "    if __name__ == \"__main__\":\n"
            "        run(a__b__c)\n\n"
            "Plain **bold** and _italic_ get stripped.\n")
-    out = compact.densify(src)
+    out = minify.densify(src)
     assert "`__name__`" in out          # inline code untouched
     assert "__main__" in out            # indented code untouched
     assert "a__b__c" in out             # intra-word underscores kept
-    assert "**bold**" not in out and "bold" in out   # prose emphasis still compacted
+    assert "**bold**" not in out and "bold" in out   # prose emphasis still minifyed

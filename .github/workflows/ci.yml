@@ -21,7 +21,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Compile (engine + compactor + scripts + bench)
-        run: python -m py_compile crawler.py compact.py scripts/*.py bench/*.py
+        run: python -m py_compile crawler.py minify.py scripts/*.py bench/*.py
 
       - name: Unit tests (deterministic compaction)
         run: python -m pytest tests/ -q

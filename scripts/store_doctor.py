@@ -7,7 +7,7 @@ flags, per slug:
     decoded as text and saved as garbage `.md` (fixed going forward by the
     asset-skip in crawler.py; existing ones still pollute the store).
   - INDEX drift: link-rows in INDEX.md disagreeing with real files on disk
-    (truncated -> orphaned pages invisible to doc-prime/LOOKUP; inflated -> phantom
+    (truncated -> orphaned pages invisible to docs-prime/LOOKUP; inflated -> phantom
     rows from anchor/trailing-slash dups).
 
 Modes:

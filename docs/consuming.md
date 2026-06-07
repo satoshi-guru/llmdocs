@@ -33,6 +33,6 @@ readability, not further compression.
 
 ## For agents
 
-See `agents/doc-context.md` — it encodes this ladder as the research workflow with a
+See `agents/docs-context.md` — it encodes this ladder as the research workflow with a
 ≤ 6 000-token fallback ceiling per library. The ceiling is a default-cost bound, not a wall:
 raw pages remain on disk and are always reachable on an explicit request.

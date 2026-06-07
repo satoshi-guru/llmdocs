@@ -1,10 +1,10 @@
 ---
-name: doc-indexer
-description: Index locally-fetched docs into COMPACT.md (per-lib read tier, ~80–120 lines) + LOOKUP.md (global grep tier) for cheap, fast API lookup — a measured 99.8–99.97% token reduction vs raw docs. Auto-chained by /llmdoc and /doc-prime after a fetch; also run standalone to (re)index libs already in ~/.llmdocs/docs/ that lack a COMPACT.md. Triggers: "index the docs", "build COMPACT/LOOKUP", "make the docs cheap to read", "re-index <lib>".
+name: docs-distill
+description: Index locally-fetched docs into COMPACT.md (per-lib read tier, ~80–120 lines) + LOOKUP.md (global grep tier) for cheap, fast API lookup — a measured 99.8–99.97% token reduction vs raw docs. Auto-chained by /docs-fetch and /docs-prime after a fetch; also run standalone to (re)index libs already in ~/.llmdocs/docs/ that lack a COMPACT.md. Triggers: "index the docs", "build COMPACT/LOOKUP", "make the docs cheap to read", "re-index <lib>".
 allowed-tools: Bash Read Write
 ---
 
-# doc-indexer
+# docs-distill
 
 Index locally fetched docs into ultra-compact reference files for cheap, fast builder lookup.
 
@@ -27,14 +27,14 @@ Reads `~/.llmdocs/docs/<lib>/` folders and produces two artifacts:
 ## Usage
 
 ```
-/doc-indexer                    → index ALL libs that have ~/.llmdocs/docs/ but no COMPACT.md
-/doc-indexer fastapi            → re-index one lib
-/doc-indexer fastapi drizzle-orm → re-index specific libs
+/docs-distill                    → index ALL libs that have ~/.llmdocs/docs/ but no COMPACT.md
+/docs-distill fastapi            → re-index one lib
+/docs-distill fastapi drizzle-orm → re-index specific libs
 ```
 
 ## When to run
 
-- After `/llmdoc` fetches new docs
+- After `/docs-fetch` fetches new docs
 - Before starting a sprint (to ensure COMPACT.md + LOOKUP.md are fresh)
 - When a library upgrades and you re-fetch its docs
 
@@ -174,7 +174,7 @@ everything gathered stays current:
 ```
 
 ```
-=== doc-indexer results ===
+=== docs-distill results ===
 fastapi     → ~/.llmdocs/docs/fastapi/COMPACT.md  (78 lines, 12 signatures extracted)
 anthropic   → ~/.llmdocs/docs/anthropic/COMPACT.md (65 lines, 8 signatures extracted)
 ...
@@ -184,5 +184,5 @@ anthropic   → ~/.llmdocs/docs/anthropic/COMPACT.md (65 lines, 8 signatures ext
 To use in a sprint:
   - Inject ~/.llmdocs/docs/<lib>/COMPACT.md into builder prompts instead of raw ~/.llmdocs/docs/
   - Run `grep "<lib>" ~/.llmdocs/docs/LOOKUP.md` to verify an import exists before writing it
-  - lib-context skill reads COMPACT.md automatically if present
+  - docs-context skill reads COMPACT.md automatically if present
 ```

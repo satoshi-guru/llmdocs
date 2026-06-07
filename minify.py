@@ -1,5 +1,5 @@
 """
-compact.py — deterministic, no-LLM Markdown compaction for llmdocs.
+minify.py — deterministic, no-LLM Markdown compaction for llmdocs.
 
 Two staged levels (each builds on the previous):
   min   — minified but still-valid Markdown. Collapses blank-line runs, trims
@@ -15,7 +15,7 @@ CRITICAL: every transform skips fenced code blocks (``` / ~~~). Code samples pas
 through verbatim. This is the most common silent bug in ad-hoc Markdown compressors.
 
 Relationship to the LLM tier: this is *mechanical* compression (complete, ~30-55%);
-`COMPACT.md` (from /doc-indexer) is *semantic* LLM distillation (~99%, lossy). They
+`COMPACT.md` (from /docs-distill) is *semantic* LLM distillation (~99%, lossy). They
 coexist — mechanical runs first/early in the core (no API key), semantic on top.
 """
 

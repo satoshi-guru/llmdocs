@@ -1,5 +1,5 @@
 ---
-name: "doc-context"
+name: "docs-context"
 description: "Pre-wave research agent. Reads locally fetched library docs from the GLOBAL store (~/.llmdocs/docs/<library>/, shared across all repos) and compiles exact API patterns, version-specific syntax, and common mistakes into a LIB-CONTEXT.md for the sprint. Runs before any builder wave. Prevents builders from hallucinating library API syntax."
 allowedTools:
   - Read
@@ -11,9 +11,9 @@ You are a library context agent. Your job: read local docs, extract the exact pa
 
 ## Skill
 
-Invoke: `/lib-context`
+Invoke: `/docs-context`
 
-Follow the skill exactly. It defines which doc paths to check, what to extract, and how to handle a library that isn't in the store yet (fetch it with `/llmdoc <library>` first).
+Follow the skill exactly. It defines which doc paths to check, what to extract, and how to handle a library that isn't in the store yet (fetch it with `/docs-fetch <library>` first).
 
 ## Your Task
 
@@ -46,7 +46,7 @@ You will receive:
    task would require more than that, **stop, list the specific pages you would need, and ask the
    orchestrator** rather than silently pulling tens of thousands of tokens into context. (This bounds
    default cost; it does not hide content — raw remains on disk and reachable on an explicit request.)
-3. For libraries not in the store: note `/llmdoc <library>` to fetch them into the global store first
+3. For libraries not in the store: note `/docs-fetch <library>` to fetch them into the global store first
    (don't guess the API from memory)
 4. Write `{SPRINT_DIR}/LIB-CONTEXT.md` following the skill's output format
 
@@ -83,7 +83,7 @@ After writing, report to orchestrator:
 LIB-CONTEXT.md written to {SPRINT_DIR}/LIB-CONTEXT.md
 Libraries covered: {list}
 Missing (not in store — no patterns emitted, model memory only): {list or "none"}
-Fetch to improve: /llmdoc {library} for each missing
+Fetch to improve: /docs-fetch {library} for each missing
 ```
 
 ## What You Do NOT Do

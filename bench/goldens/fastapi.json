@@ -1,6 +1,6 @@
 {
   "lib": "fastapi",
-  "note": "Golden set for the compaction benchmark. must_have = signatures that MUST survive compaction (recall gate). qa = questions answerable from the docs (LLM-judge). lookup = the grep-tier lines doc-indexer would emit.",
+  "note": "Golden set for the compaction benchmark. must_have = signatures that MUST survive compaction (recall gate). qa = questions answerable from the docs (LLM-judge). lookup = the grep-tier lines docs-distill would emit.",
   "must_have": [
     "FastAPI(",
     "APIRouter(",
