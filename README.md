@@ -35,13 +35,28 @@ You pay the agent-sized read **once** — to build the tiers — then every read
 then writes **correct, version-pinned** code from it: no guessing stale-training-data APIs,
 no fanning out search agents, no run → error → investigate → fix loop.
 
-**No server, no account, no API key, no quota.** The tiers are plain files on your machine —
-`grep LOOKUP.md` (~30 tokens) and `/docs-context` (reads `COMPACT.md`) deliver the savings
-**today**. A future MCP server is just a tidier doorway to the same files — an optional
-convenience, never a prerequisite.
+**No server, no account, no API key, no quota.** The tiers are plain files in
+`~/.llmdocs/docs/` — so the "lookup" is literally a `grep`, and **only the matching line
+enters the agent's context**:
 
-> "~0 tokens" is shorthand for *near*-zero: a lookup line is ~30 tokens (the text still
-> enters context), not literally free — but that's a 99.97% cut vs reading the raw docs.
+```console
+$ grep -i "getExpoPushToken" ~/.llmdocs/docs/LOOKUP.md
+expo-notifications | getExpoPushTokenAsync(options?) -> ExpoPushToken | needs projectId; await it
+```
+
+That one line (~30 tokens) is the entire answer the model reads — not the file, not the page,
+not the docs site. In Claude Code the agent runs that `grep` with its **Bash tool** and the
+~30-token result is all that lands in context; in any other setup, you (or your shell) grep the
+same file. Need usage, not just the signature? Read one tier up — `~/.llmdocs/docs/<lib>/COMPACT.md`
+(~1–2k tokens) — instead of the whole docs site (millions).
+
+**The ladder, cheapest first:** `grep LOOKUP.md` (~30) → read `COMPACT.md` (~1–2k) → read one
+raw page → read the whole site. The same files serve a plain shell, any agent framework, or a
+future MCP `docs-server` — the MCP server is just a tidier doorway to these files, never a
+prerequisite.
+
+> "~0 tokens" is shorthand for *near*-zero: a lookup line is ~30 tokens (the text still enters
+> context), not literally free — but that's a ~99.9% cut vs reading the raw docs.
 
 ---
 
