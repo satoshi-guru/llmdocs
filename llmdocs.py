@@ -218,8 +218,12 @@ def _url_to_path(url: str, out_dir: Path) -> Path:
 
 
 def _links_from_soup(soup: BeautifulSoup, base_url: str, config: dict) -> list[str]:
+    # Returns ALL same-domain, non-skipped links — link *discovery* is intentionally
+    # NOT restricted by path_prefix. The prefix governs which pages are *saved*
+    # (applied in phase1_http), not which links are followed, so that prefix pages
+    # reachable only via an out-of-prefix bridge (e.g. /doc/x linked from /products/y)
+    # are still discoverable. The crawl loop bounds the out-of-prefix excursion to 1 hop.
     root = urllib.parse.urlparse(config["url"])
-    prefix = config.get("path_prefix", "")
     skip_patterns = config.get("_skip_patterns") or _build_skip_patterns(config["url"])
     extra_skip = [re.compile(p) for p in config.get("extra_skip_patterns", [])]
     all_patterns = skip_patterns + extra_skip
@@ -234,14 +238,34 @@ def _links_from_soup(soup: BeautifulSoup, base_url: str, config: dict) -> list[s
         full_no_frag = parsed._replace(fragment="").geturl()
         if config.get("same_domain_only") and parsed.netloc != root.netloc:
             continue
-        if prefix and not parsed.path.startswith(prefix):
-            continue
         if _url_is_skipped(full_no_frag, all_patterns):
             continue
         if full_no_frag not in seen:
             seen.add(full_no_frag)
             out.append(full_no_frag)
     return out
+
+
+def _norm_url(url: str) -> str:
+    """Canonical crawl key: drop fragment only. The trailing slash is preserved —
+    for directory-style docs (e.g. readthedocs /en/latest/) it is significant and
+    stripping it can 404/redirect. Trailing-slash *variants* are instead collapsed
+    at the output layer, keyed by their shared filepath (see _file_key)."""
+    return urllib.parse.urlparse(url)._replace(fragment="").geturl()
+
+
+def _file_key(url: str, out_dir: Path) -> str:
+    """Output-file identity for a URL. /doc/x and /doc/x/ map to the same file, so
+    this collapses such variants — used to avoid double-fetching and duplicate
+    INDEX rows without altering the URL we actually request."""
+    return str(_url_to_path(url, out_dir))
+
+
+def _path_matches_prefix(url: str, prefix: str) -> bool:
+    """A page is *saved* only if its path is under path_prefix (empty prefix = all)."""
+    if not prefix:
+        return True
+    return urllib.parse.urlparse(url).path.startswith(prefix)
 
 
 def _extract_content(soup: BeautifulSoup, config: dict):  # type: ignore[return]
@@ -311,7 +335,7 @@ def _fetch_and_extract(
     config: dict,
     throttle: _FetchThrottle,
     log_lock: threading.Lock,
-) -> tuple[dict | None, list[tuple[str, int]], dict | None]:
+) -> tuple[dict | None, list[str], dict | None]:
     """Fetch one URL, extract markdown, return (page_or_None, next_links, error_or_None).
     Thread-safe — no shared state mutated here beyond logging."""
     cache_key = re.sub(r"[^\w]", "_", url)[:120]
@@ -364,11 +388,10 @@ def _fetch_and_extract(
         "depth": depth,
     }
 
-    next_links: list[tuple[str, int]] = []
+    next_links: list[str] = []
     max_depth = config.get("max_depth", 4)
     if depth < max_depth:
-        for link in _links_from_soup(soup, url, config):
-            next_links.append((link, depth + 1))
+        next_links = _links_from_soup(soup, url, config)
 
     return page, next_links, None
 
@@ -401,38 +424,64 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     print(f"          path_prefix: {prefix_str}")
     print(f"          canonical version slug: {canonical_slug}\n")
 
-    current_wave: list[tuple[str, int]] = [(start_url, 0)]
-    visited.add(start_url)
+    # Discovery is broad (same-domain); *saving* is narrow (path_prefix). To reach
+    # prefix pages that are only linked from an out-of-prefix bridge page, we allow
+    # following out-of-prefix links — but only BRIDGE_HOPS deep, so the crawl can't
+    # wander off into marketing/blog subtrees. Each frontier item carries `budget`:
+    # the number of further out-of-prefix hops it may spawn (reset to BRIDGE_HOPS on
+    # any prefix-matching link). Prefix links are always followed.
+    prefix = config.get("path_prefix", "")
+    BRIDGE_HOPS = 1
+
+    start_norm = _norm_url(start_url)
+    # `claimed` dedupes by OUTPUT FILE (not URL string) so /doc/x and /doc/x/ —
+    # which write to the same file — are fetched once and indexed once.
+    claimed: set[str] = {_file_key(start_norm, out_dir)}
+    current_wave: list[tuple[str, int, int]] = [(start_norm, 0, BRIDGE_HOPS)]
+    visited.add(start_norm)
 
     while current_wave and len(visited) < max_pages:
-        next_wave_seen: set[str] = set()
-        next_wave: list[tuple[str, int]] = []
+        wave_prefix: list[tuple[str, int, int]] = []   # saved-tier links — prioritized
+        wave_bridge: list[tuple[str, int, int]] = []   # out-of-prefix bridge links
 
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            futures = [
+            fut_meta = {
                 ex.submit(_fetch_and_extract, url, depth, session,
-                          raw_dir, out_dir, config, throttle, log_lock)
-                for url, depth in current_wave
-            ]
-            for fut in as_completed(futures):
+                          raw_dir, out_dir, config, throttle, log_lock): (depth, budget)
+                for url, depth, budget in current_wave
+            }
+            for fut in as_completed(fut_meta):
+                src_depth, src_budget = fut_meta[fut]
                 page, links, err = fut.result()
-                if page is not None:
-                    pages[page["url"]] = page
+                if page is not None and _path_matches_prefix(page["url"], prefix):
+                    pages[_file_key(page["url"], out_dir)] = page
                 if err is not None:
                     errors.append(err)
-                for link, link_depth in links:
-                    if link in visited or link in next_wave_seen:
+                for raw_link in links:
+                    link = _norm_url(raw_link)
+                    fk = _file_key(link, out_dir)
+                    if link in visited or fk in claimed:
                         continue
-                    if len(visited) + len(next_wave) >= max_pages:
-                        break
-                    next_wave_seen.add(link)
-                    next_wave.append((link, link_depth))
+                    if _path_matches_prefix(link, prefix):
+                        claimed.add(fk)
+                        wave_prefix.append((link, src_depth + 1, BRIDGE_HOPS))
+                    elif src_budget > 0:
+                        claimed.add(fk)
+                        wave_bridge.append((link, src_depth + 1, src_budget - 1))
 
-        for link, _ in next_wave:
+        # Prefix (saved) pages first so a max_pages cut never sacrifices a real doc
+        # page for a bridge page that won't even be written.
+        next_wave: list[tuple[str, int, int]] = []
+        for link, link_depth, budget in wave_prefix + wave_bridge:
+            if len(visited) + len(next_wave) >= max_pages:
+                break
             visited.add(link)
+            next_wave.append((link, link_depth, budget))
         current_wave = next_wave
 
-    print(f"\n[Phase 1] Done — {len(pages)} pages, {len(errors)} errors")
+    saved = len(pages)
+    print(f"\n[Phase 1] Done — {saved} pages saved "
+          f"(prefix={prefix or '(none)'}), {len(visited)} visited, {len(errors)} errors")
     return pages, errors
 
 
