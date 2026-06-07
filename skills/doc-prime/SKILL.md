@@ -1,7 +1,7 @@
 ---
 name: doc-prime
-description: Full pre-sprint doc workflow in one command — fetch library docs → compile LIB-CONTEXT.md → index COMPACT.md (wraps /llmdoc → /lib-context → /doc-indexer). Use when the user is about to start coding — a sprint, refactor, or feature ("before we touch any code") — and wants the docs for the libraries they'll use prepped and ready first. Triggers: "prime the docs for X and Y", "prep doc context", "get docs ready before the refactor", "run the full doc workflow", "starting the X sprint tomorrow, prime all the docs I'll need: A, B, C". Usually names 2+ libraries or a named stack (expo+supabase, fastapi+pydantic, python+hyperliquid). Don't use for a quick one-off single-library grab (use /llmdoc), or to only re-compile (/lib-context) or re-index (/doc-indexer) docs already in the store.
-argument-hint: "[lib1] [lib2] ... — library names/URLs to fetch. Omit to re-run lib-context + doc-indexer on existing docs only."
+description: Full pre-sprint doc workflow in one command — fetch library docs → index COMPACT.md → compile LIB-CONTEXT.md (wraps /llmdoc → /doc-indexer → /lib-context). Use when the user is about to start coding — a sprint, refactor, or feature ("before we touch any code") — and wants the docs for the libraries they'll use prepped and ready first. Triggers: "prime the docs for X and Y", "prep doc context", "get docs ready before the refactor", "run the full doc workflow", "starting the X sprint tomorrow, prime all the docs I'll need: A, B, C". Usually names 2+ libraries or a named stack (expo+supabase, fastapi+pydantic, python+hyperliquid). Don't use for a quick one-off single-library grab (use /llmdoc), or to only re-compile (/lib-context) or re-index (/doc-indexer) docs already in the store.
+argument-hint: "[lib1] [lib2] ... — library names/URLs to fetch. Omit to re-run doc-indexer + lib-context on existing docs only."
 allowed-tools: Bash Read Write
 ---
 

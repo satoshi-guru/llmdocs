@@ -1,3 +1,9 @@
+---
+name: doc-indexer
+description: Index locally-fetched docs into COMPACT.md (per-lib read tier, ~80–120 lines) + LOOKUP.md (global grep tier) for cheap, fast API lookup — a measured 99.8–99.97% token reduction vs raw docs. Auto-chained by /llmdoc and /doc-prime after a fetch; also run standalone to (re)index libs already in ~/.llmdocs/docs/ that lack a COMPACT.md. Triggers: "index the docs", "build COMPACT/LOOKUP", "make the docs cheap to read", "re-index <lib>".
+allowed-tools: Bash Read Write
+---
+
 # doc-indexer
 
 Index locally fetched docs into ultra-compact reference files for cheap, fast builder lookup.

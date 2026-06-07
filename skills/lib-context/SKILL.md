@@ -1,6 +1,7 @@
 ---
 name: lib-context
 description: Builds a LIB-CONTEXT.md for a sprint by reading locally fetched library docs (~/.llmdocs/docs/<library>/) and extracting exact API patterns, version-specific syntax, and common mistakes. Prevents builder agents from hallucinating library API syntax. Run before any builder wave.
+allowed-tools: Bash Read Write
 ---
 
 # Library Context Builder
@@ -31,7 +32,9 @@ After writing LIB-CONTEXT.md, suggest: "Run `/doc-indexer <lib>` to create COMPA
 
 ## Step 1: Identify Required Libraries
 
-Read the sprint PLAN.md to determine which libraries builders will use. Map each to its local doc path:
+Determine which libraries to cover: if a `PLAN.md` exists in the working directory, read it to
+see what the builders will use; otherwise use the libraries the user named (or, with no
+arguments, every lib present in `~/.llmdocs/docs/`). Map each to its local doc path:
 
 ```bash
 ls ~/.llmdocs/docs/                  # show available doc directories
@@ -107,7 +110,8 @@ from LIB-CONTEXT.md output. This is normal for external users and fresh checkout
 
 ## Step 4: Write LIB-CONTEXT.md
 
-Write to `{SPRINT_DIR}/LIB-CONTEXT.md`:
+Write to `{SPRINT_DIR}/LIB-CONTEXT.md` (use the sprint dir if one was given; otherwise default
+to `./LIB-CONTEXT.md` in the current working directory):
 
 ```markdown
 # Library Context: <SPRINT>
@@ -154,7 +158,7 @@ Run `/llmdoc <library>` (then `/doc-indexer <library>`) to fetch current docs, a
 
 After writing LIB-CONTEXT.md, report:
 ```
-LIB-CONTEXT.md written to {SPRINT_DIR}/LIB-CONTEXT.md
+LIB-CONTEXT.md written to {SPRINT_DIR or ./}LIB-CONTEXT.md
 Libraries covered (from ~/.llmdocs/docs/): {list}
 Missing (not in store — no patterns emitted): {list or "none"}
 Fetch to fix: /llmdoc {library} for each missing
