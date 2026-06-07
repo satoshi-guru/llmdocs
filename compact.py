@@ -73,10 +73,29 @@ def minify(md_text):
 
 # --- level `dense` ---------------------------------------------------------
 
-_BOLD = re.compile(r"(\*\*|__)(.*?)\1")
+_BOLD = re.compile(r"(?<!\w)(\*\*|__)(.+?)\1(?!\w)")
 _ITALIC = re.compile(r"(?<!\w)(\*|_)(.+?)\1(?!\w)")
 _HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*$", re.MULTILINE)
 _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?\s*$")
+
+
+_INLINE_CODE = re.compile(r"`[^`]*`")
+
+
+def _strip_emphasis(line: str) -> str:
+    """Remove bold/italic markers from a single PROSE line, but never inside an
+    inline `code` span and never on an indented code block (>=4 leading spaces or a
+    tab). Without this, dense ate underscores in code identifiers
+    (`__name__` -> name, a__b__c -> abc) — code must survive verbatim."""
+    if line[:1] == "\t" or re.match(r" {4,}\S", line):
+        return line  # indented code block — leave verbatim
+    parts = _INLINE_CODE.split(line)        # even idx = prose, odd = `code`
+    codes = _INLINE_CODE.findall(line)
+    parts = [_ITALIC.sub(r"\2", _BOLD.sub(r"\2", p)) for p in parts]
+    out = parts[0]
+    for c, p in zip(codes, parts[1:]):
+        out += c + p
+    return out
 
 
 def _heading_to_tag(m):
@@ -97,8 +116,7 @@ def densify(md_text):
         # separator between a heading tag and the following code fence opening,
         # which would otherwise be joined onto the same line.
         ends_newline = t.endswith("\n")
-        t = _BOLD.sub(r"\2", t)
-        t = _ITALIC.sub(r"\2", t)
+        t = "\n".join(_strip_emphasis(ln) for ln in t.split("\n"))
         t = _HEADING.sub(_heading_to_tag, t)
         out = []
         for line in t.split("\n"):

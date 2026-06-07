@@ -31,7 +31,7 @@ read tier + `LOOKUP.md` grep tier) on top. Use just the core, or the whole cycle
 ```
 
 Compaction comes in tiers, cheapest last to add: **`min`** (above, automatic, lossless-ish,
-LLM-free) → **`dense`** (`--compact dense`, aggressive machine-language) → **`COMPACT.md`**
+LLM-free) → **`dense`** (`--compact dense`, aggressive machine-language — strips prose formatting but leaves code, inline `` `code` `` and code blocks verbatim) → **`COMPACT.md`**
 (the optional LLM *semantic* distillation, ~99%). The first two need no API key.
 
 Runs are resumable — raw HTML is cached locally. Re-running skips already-fetched pages unless you pass `--no-cache`.

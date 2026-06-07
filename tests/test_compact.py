@@ -224,3 +224,18 @@ def test_dense_expand_roundtrip_preserves_code_fence():
     recovered = compact.expand(compact.densify(src))
     assert "row = a, b, c   # comma line inside code" in recovered, "code comma-line got table-parsed"
     assert "## H" in recovered
+
+
+def test_dense_preserves_code_identifiers():
+    """dense must not eat underscores in inline code, indented code, or intra-word
+    spans (regression: __name__ -> name corrupted code)."""
+    import compact
+    src = ("See `__name__` and the guard:\n\n"
+           "    if __name__ == \"__main__\":\n"
+           "        run(a__b__c)\n\n"
+           "Plain **bold** and _italic_ get stripped.\n")
+    out = compact.densify(src)
+    assert "`__name__`" in out          # inline code untouched
+    assert "__main__" in out            # indented code untouched
+    assert "a__b__c" in out             # intra-word underscores kept
+    assert "**bold**" not in out and "bold" in out   # prose emphasis still compacted
