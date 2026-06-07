@@ -707,7 +707,12 @@ def phase4_write(sorted_pages: list[tuple[str, dict]], out_dir: Path,
         import compact as _compact
         minify = _compact.minify
 
-    for url, data in sorted_pages:
+    for _file_key_unused, data in sorted_pages:
+        # `sorted_pages` is keyed by output-file (for dedup); the real source URL
+        # lives in data["url"]. Using the key here wrote the local file path into the
+        # `url:` frontmatter AND broke INDEX section grouping (regression from the
+        # dedup-by-output-file change). Always use data["url"].
+        url = data["url"]
         fp: Path = data["filepath"]
         fp.parent.mkdir(parents=True, exist_ok=True)
 

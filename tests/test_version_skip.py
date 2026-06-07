@@ -147,3 +147,19 @@ def test_document_extensions_still_followed():
             '<a href="/c.txt">t</a><a href="/d/">dir</a>')
     links = _links(html)
     assert len(links) == 4
+
+
+# --- phase4_write: frontmatter url must be the SOURCE url, not the file path ----
+
+def test_phase4_writes_source_url_not_filepath(tmp_path):
+    out = tmp_path / "out"; out.mkdir()
+    fp = out / "guide" / "intro.md"
+    page = {"url": "https://example.com/guide/intro", "title": "Intro",
+            "markdown": "Body text here, long enough to matter.",
+            "filepath": fp, "depth": 1}
+    # sorted_pages is keyed by output-file (the dedup key) — NOT the url
+    entries = L.phase4_write([(str(fp), page)], out, compact_pages=False)
+    written = fp.read_text()
+    assert "url: https://example.com/guide/intro" in written
+    assert str(out) not in written.split("\n# ")[0]  # no local path in frontmatter
+    assert entries[0]["url"] == "https://example.com/guide/intro"
