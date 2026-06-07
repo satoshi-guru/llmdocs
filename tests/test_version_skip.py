@@ -168,6 +168,27 @@ def test_phase4_writes_source_url_not_filepath(tmp_path):
     assert entries[0]["url"] == "https://example.com/guide/intro"
 
 
+# --- _url_to_path: containment against `..` traversal (A1/E1) -----------------
+
+def test_url_to_path_contains_traversal(tmp_path):
+    out = tmp_path / "store" / "lib"; out.mkdir(parents=True)
+    out_root = out.resolve()
+    for url in ("https://x.io/../../../etc/passwd", "https://x.io/a/../../b"):
+        p = L._url_to_path(url, out).resolve()
+        assert p.is_relative_to(out_root), f"{url} escaped to {p}"
+
+def test_url_to_path_normal_url_unchanged(tmp_path):
+    out = tmp_path / "lib"; out.mkdir()
+    assert L._url_to_path("https://x.io/normal/page", out) == out / "normal" / "page.md"
+
+def test_url_to_path_distinct_traversal_urls_do_not_collide(tmp_path):
+    # E-M1: two escaping URLs must map to distinct contained keys, not collapse.
+    out = tmp_path / "lib"; out.mkdir()
+    k1 = L._file_key("https://x.io/../../../etc/passwd", out)
+    k2 = L._file_key("https://x.io/../../../etc/shadow", out)
+    assert k1 != k2
+
+
 # --- _write_page: shared per-page writer (incremental crawl + github) ---------
 
 def test_write_page_frontmatter_and_entry(tmp_path):

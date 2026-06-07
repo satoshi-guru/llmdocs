@@ -23,6 +23,7 @@ Dependencies:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -264,10 +265,18 @@ DEFAULT_HEADERS = {
 def _url_to_path(url: str, out_dir: Path) -> Path:
     parsed = urllib.parse.urlparse(url)
     path = parsed.path.rstrip("/") or "/index"
-    safe = re.sub(r"[^\w/.-]", "_", path)
+    safe = re.sub(r"[^\w/.-]", "_", path)        # keeps '.', '/', '-' (so '..' survives)
     if not safe.endswith(".md"):
         safe += ".md"
-    return out_dir / safe.lstrip("/")
+    candidate = out_dir / safe.lstrip("/")
+    # Containment: urlparse does NOT collapse '..' segments, so a start URL like
+    # https://x/../../../etc/passwd would otherwise resolve OUTSIDE out_dir and write
+    # an arbitrary .md. If the resolved path escapes, fall back to a hashed name inside
+    # out_dir — contained AND collision-free for distinct escaping URLs (E-M1).
+    if not candidate.resolve().is_relative_to(out_dir.resolve()):
+        digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:16]
+        candidate = out_dir / f"_external_{digest}.md"
+    return candidate
 
 
 def _links_from_soup(soup: BeautifulSoup, base_url: str, config: dict) -> list[str]:
