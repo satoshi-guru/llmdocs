@@ -235,12 +235,14 @@ raw-docs skim (≈100k tokens of Pydantic's raw pages) still **dropped 56%** of 
 ~99.9% reduction, answering "does this API exist / what's its signature" in 1–2 tokens.
 
 **Broader sample** across the store (token-only — `chars/4`; recall/judge measured for the
-rigorous pair above, run `bench/bench.py` to add it for any lib):
+rigorous pair above, run `bench/bench.py` to add it for any lib). Raw-token counts
+**exclude binary/asset files** (PDF/PNG/ZIP the crawler decoded as text) and non-text
+blobs — only real doc pages are counted, so the ratio reflects genuine content:
 
 | Library | Raw docs (~tok) | `COMPACT.md` (tok) | Reduction |
 |---------|----------------:|-------------------:|----------:|
-| SQLite       | 1,844,815 | 1,149 | **99.94%** (1605×) |
-| TypeScript   | 1,461,059 | 1,290 | **99.91%** (1132×) |
+| SQLite       | 1,844,383 | 1,149 | **99.94%** (1605×) |
+| TypeScript   |   445,810 | 1,290 | **99.71%** (346×) |
 | httpx        |    28,798 | 1,020 | 96.46% (28×) |
 
 The httpx row shows the floor: `COMPACT.md` bottoms out around ~1k tokens, so the win shrinks

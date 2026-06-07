@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 HOME = Path(os.environ.get("LLMDOCS_HOME") or (Path.home() / ".llmdocs"))
@@ -36,6 +37,33 @@ def est_tokens(text: str) -> int:
     return len(text) // 4
 
 
+# Binary/asset files the old crawler decoded as text (PDF/PNG/ZIP/...->.md). These
+# are NOT documents; counting them inflated token totals (e.g. TypeScript raw was
+# ~70% zip/png base64). Excluded from page counts + token sums.
+_ASSET_EXT_RE = re.compile(
+    r"\.(?:png|jpe?g|gif|webp|svg|ico|bmp|tiff?|pdf|zip|tar|gz|tgz|bz2|xz|rar|7z|"
+    r"woff2?|ttf|eot|otf|mp4|mov|avi|webm|mkv|mp3|wav|ogg|flac|css|js|mjs|map|"
+    r"dmg|exe|bin|wasm|apk|deb|rpm|msi|doc|docx|ppt|pptx|xls|xlsx)\.md$",
+    re.IGNORECASE,
+)
+
+
+def _is_text_doc(p: Path) -> bool:
+    """True if the file is (almost) alphanumeric text — a real doc page. Catches
+    binary/base64 junk that slipped past the extension filter: a genuine doc is
+    overwhelmingly letters/digits/whitespace, decoded binary is not."""
+    try:
+        t = p.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    if not t:
+        return False
+    alnum = sum(c.isalnum() or c.isspace() for c in t)
+    # Low threshold: catch only true BINARY (PDF/raw bytes ~<0.4); code/table-heavy
+    # real docs (lots of symbols) and base64 (alphanumeric, caught by extension) stay.
+    return alnum / len(t) >= 0.4
+
+
 def _raw_pages(lib: Path) -> list[Path]:
     """Sorted list of raw doc pages in a library directory.
 
@@ -47,7 +75,12 @@ def _raw_pages(lib: Path) -> list[Path]:
     pages = [
         p for p in lib.rglob("*.md")
         if p.name not in SKIP_FILES
-        and not any(part in _SKIP_DIRS or part.startswith(".") for part in p.parts)
+        and not _ASSET_EXT_RE.search(p.name)
+        # check parts RELATIVE to the lib — the store root (~/.llmdocs) is itself a
+        # dotdir, so checking absolute parts would exclude every page.
+        and not any(part in _SKIP_DIRS or part.startswith(".")
+                    for part in p.relative_to(lib).parts)
+        and _is_text_doc(p)
     ]
     return sorted(pages)
 
