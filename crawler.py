@@ -787,8 +787,13 @@ def _write_page(data: dict, out_dir: Path, minify=None, provenance: dict | None 
     if md.startswith("---"):              # source already had frontmatter
         content = md
     else:
-        content = (f'---\ntitle: "{data["title"]}"\nurl: {url}\n{prov}---\n\n'
-                   f'# {data["title"]}\n\n{md}')
+        # json.dumps emits a double-quoted scalar that is valid YAML and escapes
+        # embedded `"`/newlines, so an attacker-influenced title (page <title> or
+        # a GitHub heading) can't forge extra frontmatter keys. url too.
+        title_yaml = json.dumps(data["title"])
+        heading = data["title"].replace("\n", " ").strip()
+        content = (f'---\ntitle: {title_yaml}\nurl: {json.dumps(url)}\n{prov}---\n\n'
+                   f'# {heading}\n\n{md}')
     if minify:
         content = minify(content)
     fp.write_text(content, encoding="utf-8")

@@ -5,6 +5,8 @@ numeric version (/v1.18/, reached via a /latest/ alias) must NOT be skipped to a
 single page by the generic version-skip, while unversioned-canonical sites
 (react-native: /docs/ canonical, /docs/0.77/ = old dup) must still drop old versions.
 """
+import re
+
 import crawler as L
 
 
@@ -160,7 +162,8 @@ def test_phase4_writes_source_url_not_filepath(tmp_path):
     # sorted_pages is keyed by output-file (the dedup key) — NOT the url
     entries = L.phase4_write([(str(fp), page)], out, compact_pages=False)
     written = fp.read_text()
-    assert "url: https://example.com/guide/intro" in written
+    # url is emitted as a YAML-safe quoted scalar (same parsed value)
+    assert 'url: "https://example.com/guide/intro"' in written
     assert str(out) not in written.split("\n# ")[0]  # no local path in frontmatter
     assert entries[0]["url"] == "https://example.com/guide/intro"
 
@@ -174,8 +177,24 @@ def test_write_page_frontmatter_and_entry(tmp_path):
             "filepath": fp, "depth": 1}
     entry = L._write_page(page, out, minify=None)
     txt = fp.read_text()
-    assert 'url: https://x.io/a/b' in txt and txt.startswith("---")
+    assert 'url: "https://x.io/a/b"' in txt and txt.startswith("---")
     assert entry == {"title": "B", "url": "https://x.io/a/b", "file": "a/b.md"}
+
+
+def test_write_page_title_cannot_forge_frontmatter_keys(tmp_path):
+    # A8/E2: a title containing `"`+newline must NOT inject extra YAML keys.
+    out = tmp_path / "o"; out.mkdir()
+    fp = out / "p.md"
+    page = {"url": "https://x.io/p", "title": 'x"\ninjected: pwned',
+            "markdown": "Body content, no frontmatter.", "filepath": fp, "depth": 0}
+    L._write_page(page, out, minify=None)
+    txt = fp.read_text()
+    # frontmatter is the block between the first two '---' fences
+    fm = txt[4:].split("\n---", 1)[0]
+    top_keys = [m.group(1) for ln in fm.split("\n")
+                if (m := re.match(r"([A-Za-z0-9_]+):", ln))]
+    assert top_keys == ["title", "url"], top_keys
+    assert "injected" not in top_keys
 
 
 def test_write_page_applies_minify(tmp_path):
