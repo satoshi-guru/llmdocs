@@ -63,3 +63,21 @@ def test_locale_skip_unaffected_by_version_pinning():
                                   canonical_version="v1.18")
     assert L._url_is_skipped("https://spec.matrix.org/fr/v1.18/rooms/", pats)
     assert not L._url_is_skipped("https://spec.matrix.org/en/v1.18/rooms/", pats)
+
+
+# --- _path_matches_prefix: directory-index start page ------------------------
+
+def test_prefix_matches_directory_index_without_trailing_slash():
+    # start URL "/docs" must be saved even though prefix is normalized to "/docs/"
+    assert L._path_matches_prefix("https://www.nativewind.dev/docs", "/docs/")
+    assert L._path_matches_prefix("https://www.nativewind.dev/docs/", "/docs/")
+    assert L._path_matches_prefix("https://www.nativewind.dev/docs/api", "/docs/")
+
+
+def test_prefix_does_not_overmatch_sibling():
+    assert not L._path_matches_prefix("https://www.nativewind.dev/docsfoo", "/docs/")
+    assert not L._path_matches_prefix("https://www.nativewind.dev/about", "/docs/")
+
+
+def test_empty_prefix_matches_all():
+    assert L._path_matches_prefix("https://zod.dev/anything", "")

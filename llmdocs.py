@@ -311,10 +311,15 @@ def _file_key(url: str, out_dir: Path) -> str:
 
 
 def _path_matches_prefix(url: str, prefix: str) -> bool:
-    """A page is *saved* only if its path is under path_prefix (empty prefix = all)."""
+    """A page is *saved* only if its path is under path_prefix (empty prefix = all).
+
+    The prefix is normalized with a trailing slash (e.g. "/docs/"), so the directory
+    index itself — the path WITHOUT the trailing slash (e.g. start URL "/docs") — also
+    matches. Without this, a crawl started at "/docs" would discard its own landing page."""
     if not prefix:
         return True
-    return urllib.parse.urlparse(url).path.startswith(prefix)
+    path = urllib.parse.urlparse(url).path
+    return path.startswith(prefix) or path == prefix.rstrip("/")
 
 
 def _extract_content(soup: BeautifulSoup, config: dict):  # type: ignore[return]
