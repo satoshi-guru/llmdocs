@@ -20,6 +20,31 @@ read tier + `LOOKUP.md` grep tier) on top. Use just the core, or the whole cycle
 
 ---
 
+## The economics — measured, and it works today
+
+Three ways to give a coding agent a library's docs, measured on this store:
+
+| To answer one doc question | Tokens |
+|---|---:|
+| Let an agent read the docs (the common way) | ~75,000 (measured avg) |
+| Read `COMPACT.md` (the read tier) | ~2,000 |
+| One `LOOKUP.md` line (a signature) | **~30** — *≈3,500× cheaper than the agent* |
+
+You pay the agent-sized read **once** — to build the tiers — then every read after is
+~30–2,000 tokens, in every repo, forever (break-even is the second read). And the agent
+then writes **correct, version-pinned** code from it: no guessing stale-training-data APIs,
+no fanning out search agents, no run → error → investigate → fix loop.
+
+**No server, no account, no API key, no quota.** The tiers are plain files on your machine —
+`grep LOOKUP.md` (~30 tokens) and `/lib-context` (reads `COMPACT.md`) deliver the savings
+**today**. A future MCP server is just a tidier doorway to the same files — an optional
+convenience, never a prerequisite.
+
+> "~0 tokens" is shorthand for *near*-zero: a lookup line is ~30 tokens (the text still
+> enters context), not literally free — but that's a 99.97% cut vs reading the raw docs.
+
+---
+
 ## How it works
 
 ```
