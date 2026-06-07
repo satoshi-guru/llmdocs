@@ -32,7 +32,7 @@ Runs N engines on the same URL simultaneously into isolated sandboxes; reports
 distinct files, INDEX rows (truthful?), asset-junk count, and file overlap vs the
 reference engine (the last one listed).
 ```
-ENGINES="1b=/sandbox/engine-1b.py 3=$PWD/llmdocs.py" \
+ENGINES="1b=/sandbox/engine-1b.py 3=$PWD/crawler.py" \
   PY=python3 ./benchmarks/compare_engines.sh uvicorn https://uvicorn.dev/ --workers 4 --rate-limit 0.2
 ```
 Note: pass engine-appropriate flags only — the oldest single-threaded engine

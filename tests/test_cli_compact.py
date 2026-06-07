@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 def _run(args, cwd, stdin=None):
     return subprocess.run(
-        [sys.executable, str(ROOT / "llmdocs.py"), *args],
+        [sys.executable, str(ROOT / "crawler.py"), *args],
         capture_output=True, text=True, cwd=cwd, input=stdin,
     )
 

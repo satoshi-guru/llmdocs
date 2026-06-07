@@ -10,11 +10,11 @@ the compacted reference is **910 tokens — a 99.97% reduction — while keeping
 API signatures** (100% on an LLM-judged usage test). See [`bench/REPORT.md`](bench/REPORT.md).
 
 ```bash
-python llmdocs.py --preset discord                  # fetch + convert (no LLM needed)
-python llmdocs.py --url https://docs.example.com --out output/example
+python crawler.py --preset discord                  # fetch + convert (no LLM needed)
+python crawler.py --url https://docs.example.com --out output/example
 ```
 
-**Two layers:** `llmdocs.py` is a universal core — pure crawl + HTML→markdown, no LLM, no
+**Two layers:** `crawler.py` is a universal core — pure crawl + HTML→markdown, no LLM, no
 API key. The optional Claude Code skills + agent add the LLM compaction tiers (`COMPACT.md`
 read tier + `LOOKUP.md` grep tier) on top. Use just the core, or the whole cycle.
 
@@ -79,23 +79,23 @@ Python 3.10+, no config file needed.
 
 ```bash
 # Built-in preset
-python llmdocs.py --preset discord
+python crawler.py --preset discord
 
 # Any URL
-python llmdocs.py --url https://docs.mysite.com --out output/mysite
+python crawler.py --url https://docs.mysite.com --out output/mysite
 
 # GitHub strategy (for React/SPA sites with open-source docs)
-python llmdocs.py \
+python crawler.py \
   --url https://example.com \
   --strategy github \
   --github-repo https://github.com/org/docs-repo \
   --out output/example
 
 # Force re-fetch (clear cache)
-python llmdocs.py --preset discord --no-cache
+python crawler.py --preset discord --no-cache
 
 # List presets
-python llmdocs.py --list-presets
+python crawler.py --list-presets
 ```
 
 ---
@@ -109,7 +109,7 @@ python llmdocs.py --list-presets
 | `openai` | platform.openai.com/docs | HTTP crawl |
 | `anthropic` | docs.anthropic.com | HTTP crawl |
 
-Run `python llmdocs.py --list-presets` for the live list and where each lands in the store.
+Run `python crawler.py --list-presets` for the live list and where each lands in the store.
 
 ---
 
@@ -231,7 +231,7 @@ that turn raw pages into ultra-compact references builders can consume in second
 Always in this order — **index before compile**, because `lib-context` *consumes* `COMPACT.md`:
 
 ```
-1. llmdocs.py    fetch docs → ~/.llmdocs/docs/<lib>/                    (this tool, no LLM)
+1. crawler.py    fetch docs → ~/.llmdocs/docs/<lib>/                    (this tool, no LLM)
 2. doc-indexer   index   → ~/.llmdocs/docs/<lib>/COMPACT.md + LOOKUP.md (the cheap tiers)
 3. lib-context   compile → LIB-CONTEXT.md  (sprint summary, reads COMPACT.md)
 4. store_index   refresh → ~/.llmdocs/docs/INDEX.md  (the dashboard)
@@ -281,9 +281,9 @@ the loop, `compact.py` provides two deterministic levels — **code samples are 
 byte-for-byte** (the bug the original ad-hoc compiler had):
 
 ```bash
-python llmdocs.py --compact min   <file|dir|->   # still-valid markdown, smaller
-python llmdocs.py --compact dense <file|dir|->   # machine language, smaller still
-python llmdocs.py --expand        <file.dense.md> # dense -> readable markdown (best-effort)
+python crawler.py --compact min   <file|dir|->   # still-valid markdown, smaller
+python crawler.py --compact dense <file|dir|->   # machine language, smaller still
+python crawler.py --expand        <file.dense.md> # dense -> readable markdown (best-effort)
 ```
 
 | Level | Output | Valid markdown? | Round-trip | When |

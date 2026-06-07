@@ -7,7 +7,7 @@ llmdocs has two fetch strategies. Choosing the right one matters.
 Fetches pages by following links, the same way a browser would. Works on any site that serves HTML directly.
 
 ```bash
-python llmdocs.py --url https://docs.example.com
+python crawler.py --url https://docs.example.com
 ```
 
 **Works well for:**
@@ -22,7 +22,7 @@ python llmdocs.py --url https://docs.example.com
 **How to tell if HTTP is working:** run with `--max-pages 3` first. If you get 0 pages or very thin content (< 200 chars per page), the site is JS-rendered.
 
 ```bash
-python llmdocs.py --url https://docs.example.com --max-pages 3 --out /tmp/test
+python crawler.py --url https://docs.example.com --max-pages 3 --out /tmp/test
 ```
 
 ---
@@ -32,7 +32,7 @@ python llmdocs.py --url https://docs.example.com --max-pages 3 --out /tmp/test
 Clones the docs source repo directly and reads the raw markdown files. Bypasses the website entirely.
 
 ```bash
-python llmdocs.py \
+python crawler.py \
   --url https://example.com \
   --strategy github \
   --github-repo https://github.com/org/docs-repo \

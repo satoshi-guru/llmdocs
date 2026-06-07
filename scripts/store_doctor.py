@@ -5,7 +5,7 @@ Scans the append-only store at $LLMDOCS_HOME/docs (default ~/.llmdocs/docs) and
 flags, per slug:
   - asset files: binary assets (.pdf/.png/.zip/.woff/.css/.js/...) the old crawler
     decoded as text and saved as garbage `.md` (fixed going forward by the
-    asset-skip in llmdocs.py; existing ones still pollute the store).
+    asset-skip in crawler.py; existing ones still pollute the store).
   - INDEX drift: link-rows in INDEX.md disagreeing with real files on disk
     (truncated -> orphaned pages invisible to doc-prime/LOOKUP; inflated -> phantom
     rows from anchor/trailing-slash dups).

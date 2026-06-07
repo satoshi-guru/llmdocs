@@ -1,6 +1,6 @@
 # Built-in Presets
 
-Run `python llmdocs.py --list-presets` to see all presets with their current output paths.
+Run `python crawler.py --list-presets` to see all presets with their current output paths.
 
 All presets write to `~/.llmdocs/docs/<preset>/` by default (the global store). Override
 with `--out <path>` for a single run.
@@ -18,7 +18,7 @@ with `--out <path>` for a single run.
 Discord's developer docs are a React SPA. This preset clones the official source repo and reads the markdown directly — faster and more complete than any crawl.
 
 ```bash
-python llmdocs.py --preset discord
+python crawler.py --preset discord
 ```
 
 ---
@@ -34,7 +34,7 @@ python llmdocs.py --preset discord
 GitBook renders server-side HTML so HTTP crawl works. If the URL has changed (GitBook migrations are common), update the `url` field in the preset or pass `--url` directly.
 
 ```bash
-python llmdocs.py --preset hyperliquid
+python crawler.py --preset hyperliquid
 ```
 
 ---
@@ -49,7 +49,7 @@ python llmdocs.py --preset hyperliquid
 | Coverage | API reference, models, assistants, fine-tuning, embeddings |
 
 ```bash
-python llmdocs.py --preset openai
+python crawler.py --preset openai
 ```
 
 ---
@@ -63,7 +63,7 @@ python llmdocs.py --preset openai
 | Coverage | Claude API, tool use, prompt caching, vision, models |
 
 ```bash
-python llmdocs.py --preset anthropic
+python crawler.py --preset anthropic
 ```
 
 ---
@@ -71,7 +71,7 @@ python llmdocs.py --preset anthropic
 ## Overriding preset output path
 
 ```bash
-python llmdocs.py --preset discord --out ~/my-project/docs/discord
+python crawler.py --preset discord --out ~/my-project/docs/discord
 ```
 
 The `--out` flag overrides only the output directory. All other preset settings (strategy, selectors, depth) stay the same.

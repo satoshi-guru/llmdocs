@@ -106,7 +106,7 @@ Examples:
 1. **Parse $ARGUMENTS** — resolve each token in THIS ORDER (first match wins). The order
    matters because some sites can only be fetched correctly via an engine preset:
    1. **Engine preset name** — one of the names from
-      `… llmdocs.py --list-presets` (currently `discord`, `hyperliquid`,
+      `… crawler.py --list-presets` (currently `discord`, `hyperliquid`,
       `openai`, `anthropic`; always run `--list-presets` for the live list). Fetch with
       `--preset <name>`. The preset carries the per-site **strategy** and tuned crawl config:
       e.g. `discord` uses the GitHub strategy because the Discord docs are a React SPA — a
@@ -124,7 +124,7 @@ Examples:
 
    **Case 1 (engine preset):**
    ```bash
-   python "$LLMDOCS_DIR/llmdocs.py" --preset <name>
+   python "$LLMDOCS_DIR/crawler.py" --preset <name>
    ```
    (`$LLMDOCS_DIR` = your llmdocs clone — `install.sh` records it; defaults assume the engine
    is on your `PATH`/clone. Run from anywhere.)
@@ -133,7 +133,7 @@ Examples:
 
    **Cases 3–4 (alias / raw URL):**
    ```bash
-   python "$LLMDOCS_DIR/llmdocs.py" \
+   python "$LLMDOCS_DIR/crawler.py" \
      --url <URL> \
      --workers 4 --rate-limit 0.25 \
      --out ~/.llmdocs/docs/<slug>/

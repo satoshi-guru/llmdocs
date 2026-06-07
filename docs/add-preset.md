@@ -1,6 +1,6 @@
 # Adding a Custom Preset
 
-Presets are entries in the `PRESETS` dict at the top of `llmdocs.py`. Adding one takes about 10 lines.
+Presets are entries in the `PRESETS` dict at the top of `crawler.py`. Adding one takes about 10 lines.
 
 ## HTTP preset
 
@@ -57,7 +57,7 @@ If you're unsure, try `"main"` first — it's the correct semantic element on mo
 
 ```bash
 # Test with 5 pages only, output to /tmp
-python llmdocs.py --preset mysite --max-pages 5 --out /tmp/test_mysite
+python crawler.py --preset mysite --max-pages 5 --out /tmp/test_mysite
 
 # Check what was extracted
 ls /tmp/test_mysite/

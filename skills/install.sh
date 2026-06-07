@@ -14,8 +14,8 @@ command -v python3 >/dev/null 2>&1 || {
   echo "ERROR: python3 not found on PATH. Install Python 3.10+ first." >&2
   exit 1
 }
-python3 "$REPO_DIR/llmdocs.py" --help >/dev/null 2>&1 || {
-  echo "ERROR: llmdocs.py not runnable at $REPO_DIR. Check your clone or Python install." >&2
+python3 "$REPO_DIR/crawler.py" --help >/dev/null 2>&1 || {
+  echo "ERROR: crawler.py not runnable at $REPO_DIR. Check your clone or Python install." >&2
   exit 1
 }
 

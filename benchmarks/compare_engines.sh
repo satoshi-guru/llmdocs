@@ -5,10 +5,10 @@
 # (truthful?), asset-junk count, and pairwise file overlap vs the reference engine.
 #
 # Engines are given as NAME=PATH pairs via $ENGINES (space-separated). Each PATH is
-# a llmdocs.py. The LAST engine is the reference for overlap (diff vs it).
+# a crawler.py. The LAST engine is the reference for overlap (diff vs it).
 #
 # Usage:
-#   ENGINES="1b=/sandbox/engine-1b.py 3=/repo/llmdocs.py" \
+#   ENGINES="1b=/sandbox/engine-1b.py 3=/repo/crawler.py" \
 #     ./compare_engines.sh <slug> <url> [extra llmdocs args...]
 # Env: PY (python, default python3), OUT (sandbox root, default ./bench-out)
 set -u

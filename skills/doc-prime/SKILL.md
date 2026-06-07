@@ -17,7 +17,7 @@ Arguments: $ARGUMENTS
 
 ## Step 1 — Fetch docs (llmdoc)
 
-**Follow the `llmdoc` skill instructions** for `$ARGUMENTS` — do **not** call `llmdocs.py`
+**Follow the `llmdoc` skill instructions** for `$ARGUMENTS` — do **not** call `crawler.py`
 directly here. `/llmdoc` is the single owner of token resolution (engine preset → `preset:`
 group → alias → raw URL) and picks `--preset` vs `--url` correctly. This matters: routing a
 React-SPA preset like `discord` through a plain `--url` fetches 0 pages, so doc-prime must not

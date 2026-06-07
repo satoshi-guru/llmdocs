@@ -21,13 +21,13 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Compile (engine + compactor + scripts + bench)
-        run: python -m py_compile llmdocs.py compact.py scripts/*.py bench/*.py
+        run: python -m py_compile crawler.py compact.py scripts/*.py bench/*.py
 
       - name: Unit tests (deterministic compaction)
         run: python -m pytest tests/ -q
 
       - name: Smoke — list presets
-        run: python llmdocs.py --list-presets
+        run: python crawler.py --list-presets
 
       - name: Bench recall gate (fixture store; deterministic recall+token, judge auto-skips)
         run: python bench/bench.py --libs alpha-lib --store store/example --out /tmp/bench-ci.md
@@ -36,7 +36,7 @@ jobs:
         run: python -m scripts.store_index --store store/example --out store/INDEX.md --check
 
       - name: Compaction drift gate (mechanical min tier)
-        run: python llmdocs.py --check store/example/alpha-lib/page.md
+        run: python crawler.py --check store/example/alpha-lib/page.md
 
       - name: Leak gate (must find zero hits)
         # Uses `git grep` so ONLY tracked files are scanned — never the CI working

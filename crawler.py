@@ -9,12 +9,12 @@ Four phases:
   4. Convert  — write clean .md files with YAML frontmatter for LLM consumption
 
 Usage:
-  python llmdocs.py --preset discord
-  python llmdocs.py --preset hyperliquid
-  python llmdocs.py --url https://example.com/docs --out docs/example
-  python llmdocs.py --url https://example.com --strategy github --github-repo https://github.com/org/repo
-  python llmdocs.py --list-presets
-  python llmdocs.py --preset discord --no-cache
+  python crawler.py --preset discord
+  python crawler.py --preset hyperliquid
+  python crawler.py --url https://example.com/docs --out docs/example
+  python crawler.py --url https://example.com --strategy github --github-repo https://github.com/org/repo
+  python crawler.py --list-presets
+  python crawler.py --preset discord --no-cache
 
 Dependencies:
   pip install beautifulsoup4 html2text lxml requests

@@ -14,10 +14,10 @@ Python 3.10+ required. No config file needed.
 
 ```bash
 # Use a built-in preset (fastest — no URL needed)
-python llmdocs.py --preset discord
+python crawler.py --preset discord
 
 # Scrape any docs URL
-python llmdocs.py --url https://docs.example.com --out output/example
+python crawler.py --url https://docs.example.com --out output/example
 ```
 
 That's it. Results land in `~/.llmdocs/docs/discord/` (the global doc store). Override with
@@ -67,13 +67,13 @@ run to save disk space.
 To retain the cache for faster re-runs:
 
 ```bash
-python llmdocs.py --preset discord --keep-html
+python crawler.py --preset discord --keep-html
 ```
 
 To force a full re-fetch (ignoring any cached files):
 
 ```bash
-python llmdocs.py --preset discord --no-cache
+python crawler.py --preset discord --no-cache
 ```
 
 ## Next steps

@@ -5,7 +5,7 @@ numeric version (/v1.18/, reached via a /latest/ alias) must NOT be skipped to a
 single page by the generic version-skip, while unversioned-canonical sites
 (react-native: /docs/ canonical, /docs/0.77/ = old dup) must still drop old versions.
 """
-import llmdocs as L
+import crawler as L
 
 
 # --- _detect_concrete_version ------------------------------------------------
