@@ -27,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -498,7 +499,7 @@ def _fetch_and_extract(
     return page, next_links, None
 
 
-def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
+def phase1_http(config: dict, out_dir: Path) -> tuple[list[dict], list[dict]]:
     session = requests.Session()
     session.headers.update(DEFAULT_HEADERS)
 
@@ -563,7 +564,20 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     current_wave: list[tuple[str, int, int]] = [(start_norm, 0, BRIDGE_HOPS)]
     visited.add(start_norm)
 
-    while current_wave and len(visited) < max_pages:
+    # Write each page as it is extracted (not buffered to a final phase) so a crawl
+    # that is killed or times out KEEPS what it already fetched. A SIGTERM/SIGINT
+    # handler turns an interrupt into a graceful stop that still writes the INDEX. (#14)
+    minify = None
+    if config.get("compact_pages", True):
+        import compact as _compact
+        minify = _compact.minify
+    _stop = {"flag": False}
+    def _on_stop(_signum, _frame):
+        _stop["flag"] = True
+    _prev_int = signal.signal(signal.SIGINT, _on_stop)
+    _prev_term = signal.signal(signal.SIGTERM, _on_stop)
+
+    while current_wave and len(visited) < max_pages and not _stop["flag"]:
         wave_prefix: list[tuple[str, int, int]] = []   # saved-tier links — prioritized
         wave_bridge: list[tuple[str, int, int]] = []   # out-of-prefix bridge links
 
@@ -577,7 +591,10 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
                 src_depth, src_budget = fut_meta[fut]
                 page, links, err = fut.result()
                 if page is not None and _path_matches_prefix(page["url"], prefix):
-                    pages[_file_key(page["url"], out_dir)] = page
+                    fk = _file_key(page["url"], out_dir)
+                    if fk not in pages:
+                        _write_page(page, out_dir, minify)  # write now: survive interrupt
+                    pages[fk] = page
                 if err is not None:
                     errors.append(err)
                 for raw_link in links:
@@ -607,10 +624,20 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
             next_wave.append((link, link_depth, budget))
         current_wave = next_wave
 
-    saved = len(pages)
-    print(f"\n[Phase 1] Done — {saved} pages saved "
-          f"(prefix={prefix or '(none)'}), {len(visited)} visited, {len(errors)} errors")
-    return pages, errors
+    signal.signal(signal.SIGINT, _prev_int)
+    signal.signal(signal.SIGTERM, _prev_term)
+    # Build INDEX from whatever was saved (sorted identically to the buffered path).
+    sorted_pages = phase3_sort(pages)
+    index_entries = [
+        {"title": d["title"], "url": d["url"],
+         "file": str(d["filepath"].relative_to(out_dir))}
+        for _k, d in sorted_pages
+    ]
+    _write_index(index_entries, out_dir, config)
+    note = "  [TRUNCATED — interrupted before the crawl finished]" if _stop["flag"] else ""
+    print(f"\n[Phase 1] Done — {len(pages)} pages saved "
+          f"(prefix={prefix or '(none)'}), {len(visited)} visited, {len(errors)} errors{note}")
+    return index_entries, errors
 
 
 # ---------------------------------------------------------------------------
@@ -693,46 +720,39 @@ def phase3_sort(pages: dict) -> list[tuple[str, dict]]:
 # Phase 4: Write LLM-ready markdown files
 # ---------------------------------------------------------------------------
 
+def _write_page(data: dict, out_dir: Path, minify=None) -> dict:
+    """Write one page (frontmatter + optional min-compaction) to its output file and
+    return its INDEX entry. Shared by the incremental HTTP crawl (#14) and the github
+    strategy. `data["url"]` is the real source URL (the pages dict is keyed by the
+    output-file for dedup — never use the key as the url)."""
+    url = data["url"]
+    fp: Path = data["filepath"]
+    fp.parent.mkdir(parents=True, exist_ok=True)
+    md = data["markdown"]
+    if md.startswith("---"):              # source already had frontmatter
+        content = md
+    else:
+        content = (f'---\ntitle: "{data["title"]}"\nurl: {url}\n---\n\n'
+                   f'# {data["title"]}\n\n{md}')
+    if minify:
+        content = minify(content)
+    fp.write_text(content, encoding="utf-8")
+    return {"title": data["title"], "url": url, "file": str(fp.relative_to(out_dir))}
+
+
 def phase4_write(sorted_pages: list[tuple[str, dict]], out_dir: Path,
                  compact_pages: bool = True) -> list[dict]:
-    index_entries = []
     print(f"\n[Phase 4] Writing {len(sorted_pages)} files"
           f"{' (deterministic min compaction)' if compact_pages else ' (raw)'}...")
-
-    # Deterministic, no-LLM compaction applied at write time — so compaction is an
-    # early pipeline step, not a deferred last one. `min` is lossless-ish (still
-    # valid Markdown) and fence-safe (code preserved). Opt out with --raw.
     minify = None
     if compact_pages:
         import compact as _compact
         minify = _compact.minify
-
+    index_entries = []
     for _file_key_unused, data in sorted_pages:
-        # `sorted_pages` is keyed by output-file (for dedup); the real source URL
-        # lives in data["url"]. Using the key here wrote the local file path into the
-        # `url:` frontmatter AND broke INDEX section grouping (regression from the
-        # dedup-by-output-file change). Always use data["url"].
-        url = data["url"]
-        fp: Path = data["filepath"]
-        fp.parent.mkdir(parents=True, exist_ok=True)
-
-        md = data["markdown"]
-        # Don't double-add frontmatter if source already has it
-        if md.startswith("---"):
-            content = md
-        else:
-            content = (
-                f'---\ntitle: "{data["title"]}"\nurl: {url}\n---\n\n'
-                f'# {data["title"]}\n\n{md}'
-            )
-
-        if minify:
-            content = minify(content)
-        fp.write_text(content, encoding="utf-8")
-        rel = str(fp.relative_to(out_dir))
-        index_entries.append({"title": data["title"], "url": url, "file": rel})
-        print(f"  write  {rel}")
-
+        entry = _write_page(data, out_dir, minify)
+        index_entries.append(entry)
+        print(f"  write  {entry['file']}")
     return index_entries
 
 
@@ -774,20 +794,20 @@ def run(config: dict) -> int:
 
     if strategy == "github":
         pages, errors = phase1_github(config, out_dir)
+        if not pages:
+            print("\n[FATAL] No pages extracted.")
+            return 1
+        sorted_pages = phase3_sort(pages)
+        index_entries = phase4_write(sorted_pages, out_dir, config.get("compact_pages", True))
+        _write_index(index_entries, out_dir, config)
     else:
-        pages, errors = phase1_http(config, out_dir)
-
-    if not pages:
-        print("\n[FATAL] No pages extracted.")
-        if strategy == "http":
+        # HTTP crawl writes each page + the INDEX itself (incremental, interrupt-safe).
+        index_entries, errors = phase1_http(config, out_dir)
+        if not index_entries:
+            print("\n[FATAL] No pages extracted.")
             print("  Tip: site may be a JS/SPA. Use --strategy github if docs are open source.")
-        return 1
-
-    print(f"\n[Phase 3] Sorting {len(pages)} pages...")
-    sorted_pages = phase3_sort(pages)
-
-    index_entries = phase4_write(sorted_pages, out_dir, config.get("compact_pages", True))
-    _write_index(index_entries, out_dir, config)
+            return 1
+    n_written = len(index_entries)
 
     if errors:
         err_file = out_dir / "_errors.json"
@@ -802,7 +822,7 @@ def run(config: dict) -> int:
                 print(f"[cleanup] removed {d.name}/ (use --keep-html to retain)")
 
     print(f"\n{'='*60}")
-    print(f"  Done — {len(pages)} pages → {out_dir.resolve()}")
+    print(f"  Done — {n_written} pages → {out_dir.resolve()}")
     print(f"{'='*60}\n")
     return 0
 

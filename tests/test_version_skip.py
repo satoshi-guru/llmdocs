@@ -163,3 +163,24 @@ def test_phase4_writes_source_url_not_filepath(tmp_path):
     assert "url: https://example.com/guide/intro" in written
     assert str(out) not in written.split("\n# ")[0]  # no local path in frontmatter
     assert entries[0]["url"] == "https://example.com/guide/intro"
+
+
+# --- _write_page: shared per-page writer (incremental crawl + github) ---------
+
+def test_write_page_frontmatter_and_entry(tmp_path):
+    out = tmp_path / "o"; out.mkdir()
+    fp = out / "a" / "b.md"
+    page = {"url": "https://x.io/a/b", "title": "B", "markdown": "Body.",
+            "filepath": fp, "depth": 1}
+    entry = L._write_page(page, out, minify=None)
+    txt = fp.read_text()
+    assert 'url: https://x.io/a/b' in txt and txt.startswith("---")
+    assert entry == {"title": "B", "url": "https://x.io/a/b", "file": "a/b.md"}
+
+
+def test_write_page_applies_minify(tmp_path):
+    out = tmp_path / "o"; out.mkdir(); fp = out / "p.md"
+    page = {"url": "https://x.io/p", "title": "P",
+            "markdown": "line1\n\n\n\n\nline2", "filepath": fp, "depth": 0}
+    L._write_page(page, out, minify=lambda s: s.replace("\n\n\n\n\n", "\n\n"))
+    assert "\n\n\n\n" not in fp.read_text()
