@@ -12,3 +12,6 @@ build/
 
 # Local Claude Code config — ship settings.json.example instead
 .claude/settings.json
+
+# internal pre-publish handoff (private identity context) — never publish
+PUBLISH_TODO.md
