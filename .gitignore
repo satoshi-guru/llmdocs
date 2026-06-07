@@ -16,3 +16,6 @@ build/
 # internal pre-publish handoff (private identity context) — never publish
 PUBLISH_TODO.md
 FINAL_PLAN.md
+
+# stale internal sprint plan — superseded by FINAL_PLAN.md (never publish)
+NEXT_STEPS.md
