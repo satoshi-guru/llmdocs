@@ -15,3 +15,4 @@ build/
 
 # internal pre-publish handoff (private identity context) — never publish
 PUBLISH_TODO.md
+FINAL_PLAN.md
