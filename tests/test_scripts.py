@@ -266,3 +266,56 @@ def test_manifest_and_store_index_agree_on_count(tmp_path):
     assert store_index_count == manifest_count, (
         f"manifest count ({manifest_count}) != store_index count ({store_index_count})"
     )
+
+
+# ---------------------------------------------------------------------------
+# store_index — modular scan/format split, reduction bar, totals, --plain
+# ---------------------------------------------------------------------------
+
+def _example_store(tmp_path):
+    """A 2-library store: one fully indexed, one raw-only."""
+    store = tmp_path / "docs"
+    full = store / "full"
+    full.mkdir(parents=True)
+    (full / "page.md").write_text("# full\n" + "word " * 400, encoding="utf-8")
+    (full / "INDEX.md").write_text("# idx\n", encoding="utf-8")
+    (full / "COMPACT.md").write_text("# compact\nIndexed: 2026-06-01\nshort\n", encoding="utf-8")
+    (store / "LOOKUP.md").write_text("full | thing() | does a thing\n", encoding="utf-8")
+    rawonly = store / "rawonly"
+    rawonly.mkdir(parents=True)
+    (rawonly / "page.md").write_text("# raw\nbody\n", encoding="utf-8")
+    return store
+
+
+def test_bar_is_deterministic_and_clamped():
+    from scripts.store_index import _bar
+    assert _bar(0.0) == "░" * 8
+    assert _bar(1.0) == "█" * 8
+    assert _bar(-5) == _bar(0.0)        # clamps low
+    assert _bar(5) == _bar(1.0)         # clamps high
+    assert _bar(0.5) == _bar(0.5)       # pure: same input → same output
+
+
+def test_scan_returns_pure_rows(tmp_path):
+    from scripts.store_index import scan
+    rows = {r.name: r for r in scan(_example_store(tmp_path))}
+    assert set(rows) == {"full", "rawonly"}
+    assert rows["full"].tiers == "RICL"
+    assert rows["rawonly"].tiers == "R···"
+    assert rows["full"].reduction is not None and 0 < rows["full"].reduction < 1
+    assert rows["rawonly"].reduction is None   # no COMPACT → not indexed
+
+
+def test_format_dashboard_has_totals_and_bar(tmp_path):
+    from scripts.store_index import scan, format_dashboard
+    rows = scan(_example_store(tmp_path))
+    rich = format_dashboard(rows, plain=False)
+    plain = format_dashboard(rows, plain=True)
+    assert "**Total**" in rich and "**Total**" in plain
+    assert "█" in rich, "rich mode must draw the reduction bar"
+    assert "█" not in plain, "plain mode must omit the bar"
+    # data identical across renderings: the page count survives both
+    import re
+    for body in (rich, plain):
+        m = re.search(r"\|\s*full\s*\|[^|]+\|\s*(\d+)\s*\|", body)
+        assert m and int(m.group(1)) == 1
