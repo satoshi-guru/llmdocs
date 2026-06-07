@@ -466,8 +466,13 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
                         claimed.add(fk)
                         wave_prefix.append((link, src_depth + 1, BRIDGE_HOPS))
                     elif src_budget > 0:
+                        # Bridge hops are depth-TRANSPARENT: a one-hop detour through an
+                        # out-of-prefix page must not inflate the depth that gates doc
+                        # discovery, or a /docs hub first reached via a bridge would hit
+                        # max_depth early and drop its children (regressed react-native by
+                        # 14). The excursion is already bounded by BRIDGE_HOPS.
                         claimed.add(fk)
-                        wave_bridge.append((link, src_depth + 1, src_budget - 1))
+                        wave_bridge.append((link, src_depth, src_budget - 1))
 
         # Prefix (saved) pages first so a max_pages cut never sacrifices a real doc
         # page for a bridge page that won't even be written.
