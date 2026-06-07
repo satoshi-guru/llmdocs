@@ -359,3 +359,30 @@ def test_fetch_allows_normal_html(tmp_path):
                                          L._FetchThrottle(0), threading.Lock())
     assert page is not None and err is None
     assert any(raw.iterdir())       # within-cap body IS cached
+
+
+# --- phase1_github coverage (E3) — docs/ read, skip-dirs, .mdx->.md, branch, title --
+
+def test_phase1_github_reads_docs_skips_nondoc_and_rewrites_mdx(tmp_path, monkeypatch):
+    import types
+    out = tmp_path / "out"
+    clone = out / "_github_clone" / "docs"; clone.mkdir(parents=True)
+    (clone / "intro.md").write_text("# Intro Title\n\nbody text long enough.\n")
+    (clone / "guide.mdx").write_text("## Guide Heading\n\nmore body content here.\n")
+    (clone / "examples").mkdir()
+    (clone / "examples" / "skip.md").write_text("# Skip\n\nx\n")
+
+    def fake_run(cmd, **k):   # no real git: pull is a no-op, symbolic-ref yields the branch
+        stdout = "feature-branch" if "symbolic-ref" in cmd else "ok"
+        return types.SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+    monkeypatch.setattr(L.subprocess, "run", fake_run)
+
+    cfg = {"github_repo": "https://github.com/org/repo", "github_docs_dir": "docs"}
+    pages, errs = L.phase1_github(cfg, out)
+
+    urls = {d["url"] for d in pages.values()}
+    assert any(u.endswith("/blob/feature-branch/docs/intro.md") for u in urls)   # detected branch in blob url
+    assert any(d["filepath"].name == "guide.md" for d in pages.values())          # .mdx -> .md
+    assert not any("skip" in d["title"].lower() for d in pages.values())          # examples/ skipped
+    assert any(d["title"] == "Intro Title" for d in pages.values())               # title from heading
+    assert errs == []
