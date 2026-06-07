@@ -200,6 +200,15 @@ def test_cache_key_distinct_for_distinct_urls():
     assert L._cache_key("https://x.io/a") != L._cache_key("https://x.io/b")
 
 
+# --- _md_link_text: INDEX link injection via title (A-M2) ---------------------
+
+def test_md_link_text_escapes_brackets_and_newlines():
+    assert L._md_link_text("evil](http://x.com)") == "evil\\](http://x.com)"
+    assert L._md_link_text("has ] bracket") == "has \\] bracket"
+    assert L._md_link_text("line\nbreak") == "line break"
+    assert L._md_link_text("plain title") == "plain title"
+
+
 # --- _write_page: shared per-page writer (incremental crawl + github) ---------
 
 def test_write_page_frontmatter_and_entry(tmp_path):

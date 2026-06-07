@@ -559,7 +559,11 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[list[dict], list[dict]]:
             r0 = session.get(start_url, timeout=20, allow_redirects=True)
             if r0.status_code == 200:
                 canonical_version = _dominant_linked_version(r0.text, start_url)
-        except Exception:
+        except Exception as exc:
+            # Scope-affecting: a failure here silently changes path_prefix / the
+            # skip-set, so a transient network blip alters what gets saved. Log it
+            # rather than swallow it (A9).
+            print(f"  ⚠ canonical-version probe failed ({exc!r}); using default scope")
             canonical_version = None
     if canonical_version:
         config["path_prefix"] = f"/{canonical_version}/"
@@ -687,7 +691,7 @@ def phase1_github(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     else:
         print("  Cloning (shallow)...")
         result = subprocess.run(
-            ["git", "clone", "--depth=1", repo_url, str(clone_dir)],
+            ["git", "clone", "--depth=1", "--", repo_url, str(clone_dir)],
             capture_output=True, text=True,
         )
         if result.returncode != 0:
@@ -832,6 +836,13 @@ def phase4_write(sorted_pages: list[tuple[str, dict]], out_dir: Path,
     return index_entries
 
 
+def _md_link_text(s: str) -> str:
+    """Escape a page title for use as Markdown link TEXT, so a `]` / `](evil)` in the
+    title can't truncate or hijack the INDEX link (A-M2). Newlines are flattened too."""
+    s = s.replace("\n", " ").strip()
+    return s.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
 def _write_index(entries: list[dict], out_dir: Path, config: dict) -> None:
     sections: dict[str, list[dict]] = {}
     for e in entries:
@@ -851,7 +862,7 @@ def _write_index(entries: list[dict], out_dir: Path, config: dict) -> None:
     for section, sec_entries in sorted(sections.items()):
         lines.append(f"\n## {section.replace('-', ' ').replace('_', ' ').title()}\n")
         for e in sec_entries:
-            lines.append(f"- [{e['title']}]({e['file']})")
+            lines.append(f"- [{_md_link_text(e['title'])}]({e['file']})")
 
     (out_dir / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
     print(f"\n[Index] {out_dir / 'INDEX.md'}")
