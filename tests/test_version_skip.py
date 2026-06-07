@@ -113,3 +113,37 @@ def test_derive_scope_explicit_args_win_including_depth_zero():
     # --path-prefix and --max-depth override; max-depth 0 must NOT be coerced to default
     assert L._derive_scope("https://man7.org/a/b/c.8.html", "/custom/", 0) == ("/custom/", 0)
     assert L._derive_scope("https://reactnative.dev/docs/x", None, 7) == ("/docs/", 7)
+
+
+# --- binary-asset link filtering (no PDF/PNG/ZIP -> .md) ---------------------
+
+def _links(html, base="https://docs.arbitrum.io/intro"):
+    from bs4 import BeautifulSoup
+    cfg = {"url": base, "same_domain_only": True,
+           "_skip_patterns": L._build_skip_patterns(base)}
+    return L._links_from_soup(BeautifulSoup(html, "lxml"), base, cfg)
+
+
+def test_asset_links_are_not_followed():
+    html = (
+        '<a href="/docs/intro">doc</a>'
+        '<a href="/assets/files/audit.pdf">pdf</a>'
+        '<a href="/img/logo.png">png</a>'
+        '<a href="/dl/sdk.zip">zip</a>'
+        '<a href="/fonts/x.woff2">font</a>'
+        '<a href="/static/app.js">js</a>'
+        '<a href="/theme.css">css</a>'
+        '<a href="/diagram.svg">svg</a>'
+        '<a href="/report.PDF">UPPER pdf</a>'
+    )
+    links = _links(html)
+    assert any(u.endswith("/docs/intro") for u in links)
+    assert not any(L._ASSET_EXT_RE.search(u) for u in links), links
+    assert len(links) == 1
+
+
+def test_document_extensions_still_followed():
+    html = ('<a href="/a.html">h</a><a href="/b.md">m</a>'
+            '<a href="/c.txt">t</a><a href="/d/">dir</a>')
+    links = _links(html)
+    assert len(links) == 4

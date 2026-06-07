@@ -86,6 +86,23 @@ DEFAULT_SKIP_URL_PATTERNS = [
 # OLD duplicate doc trees we want to skip (keep only the unversioned/canonical
 # tree). The pattern is built in _build_skip_patterns so the ONE canonical
 # version can be exempted -- see _CONCRETE_VERSION_RE / canonical_version.
+# Binary / non-document asset extensions. Links to these are never followed and
+# never written as pages -- otherwise a PDF/PNG/ZIP gets fetched, its raw bytes
+# decoded as "text", and saved as a garbage .md (e.g. arbitrum turned ~40 audit
+# PDFs into .md). Document formats (.html/.htm/.md/.txt/.php) are intentionally
+# NOT in this list. Matched case-insensitively at the end of the URL path.
+_ASSET_EXT_RE = re.compile(
+    r"\.(?:png|jpe?g|gif|webp|svg|ico|bmp|tiff?|"
+    r"pdf|zip|tar|gz|tgz|bz2|xz|rar|7z|"
+    r"woff2?|ttf|eot|otf|"
+    r"mp4|mov|avi|webm|mkv|mp3|wav|ogg|flac|"
+    r"css|js|mjs|map|"
+    r"dmg|exe|bin|wasm|apk|deb|rpm|msi|"
+    r"doc|docx|ppt|pptx|xls|xlsx)$",
+    re.IGNORECASE,
+)
+
+
 _VERSION_PATH_RE = r"v?\d+\.\d+(\.\d+)?"
 _CONCRETE_VERSION_RE = re.compile(rf"^{_VERSION_PATH_RE}$")
 
@@ -287,6 +304,8 @@ def _links_from_soup(soup: BeautifulSoup, base_url: str, config: dict) -> list[s
         full_no_frag = parsed._replace(fragment="").geturl()
         if config.get("same_domain_only") and parsed.netloc != root.netloc:
             continue
+        if _ASSET_EXT_RE.search(parsed.path):
+            continue  # never follow/save binary assets (PDF/PNG/ZIP/font/...)
         if _url_is_skipped(full_no_frag, all_patterns):
             continue
         if full_no_frag not in seen:
