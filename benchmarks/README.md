@@ -45,7 +45,7 @@ The historical engines live in the `llmdocs` repo (github.com/satoshi-guru/llmdo
 - **#1b** = commit `326692b` (parallel + prefix, "production crawler")
 - **#1aF / #1bF** = branches `engine-1aF` / `engine-1bF` — those bases + all
   applicable crawl fixes (for the record; #1bF converges to #3, #1aF stays broad)
-- **#3** = this repo (`llmdocs-next`), the current best baseline
+- **#3** = this repo (`llmdocs`), the current best baseline
 
 Extract a snapshot with e.g. `git -C ../llmdocs show 326692b:llmdocs.py > /sandbox/engine-1b.py`.
 

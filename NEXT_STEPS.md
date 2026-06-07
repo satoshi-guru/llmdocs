@@ -1,4 +1,4 @@
-# llmdocs-next — Next Steps Plan
+# llmdocs — Next Steps Plan
 
 Sequenced plan for the 6 open issues (#14–#19). Order respects dependencies:
 engine reliability + provenance must land **before** any mass store re-fetch.
@@ -144,7 +144,7 @@ required (the store is local data, not published).
 **Branch:** `chore/publish-prep`
 
 **Step-by-step:**
-1. Decide scope/repo: publish `llmdocs-next` itself, or a clean public mirror;
+1. Decide scope/repo: publish `llmdocs` itself, or a clean public mirror;
    choose a license; confirm with user.
 2. De-personalization audit: grep for private paths/hosts/tokens; scrub.
 3. Ensure skills (doc-prime, llmdoc, lib-context, doc-indexer) + install.sh are
