@@ -38,19 +38,45 @@ jobs:
       - name: Compaction drift gate (mechanical min tier)
         run: python crawler.py --check store/example/alpha-lib/page.md
 
-      - name: Leak gate (must find zero hits)
-        # The denylist (private infra/identity strings) lives in the LEAK_DENYLIST
-        # repo secret, NOT in this public workflow file — otherwise the gate would
-        # publish the very strings it guards against. Uses `git grep` so ONLY tracked
-        # files are scanned, excluding .github. On forks/PRs without secret access the
-        # gate is skipped with a warning (a fork can't introduce the owner's private
-        # strings; merges to main re-run it with the secret present). Fail-CLOSED: a
-        # real grep tooling error (exit >=2) is treated as a leak, not a pass.
+      - name: Leak gate — fork-safe structural scan (always runs)
+        # GENERIC accidental-leak patterns that are safe to commit publicly (no
+        # private strings appear here). This step has no secret dependency, so it runs
+        # even on fork PRs that get no secret access — closing the hole where a fork PR
+        # could ADD an obvious secret / absolute home path and pass the gate as a green
+        # skip. It catches a CLASS of leaks, not the owner's specific private strings
+        # (those are the next step's job). Uses `git grep` so ONLY tracked files are
+        # scanned, excluding .github. Fail-CLOSED on a real grep error (exit >=2).
+        run: |
+          set +e
+          hits=$(git grep -nIE '/home/[a-z][a-z0-9_-]*/|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----' -- . ':!.github/*')
+          rc=$?
+          set -e
+          if [ "$rc" -ge 2 ]; then echo "::error::fork-safe leak scan git grep errored ($rc) — treating as leak"; exit 1; fi
+          if [ "$rc" -eq 0 ]; then echo "$hits"; echo "::error::fork-safe leak scan found forbidden patterns"; exit 1; fi
+          echo "fork-safe leak scan clean"
+
+      - name: Leak gate — private denylist (secret)
+        # The owner's specific private infra/identity strings live in the LEAK_DENYLIST
+        # repo secret, NOT in this public file — committing them would publish the very
+        # strings the gate guards. Forks get no secret, so this step CANNOT scan a fork
+        # PR for the private strings; the fork-safe step above is the fork's coverage.
+        #   - push to main (secret MUST be present): empty secret => FAIL closed (a
+        #     silently-cleared secret must not pass as green).
+        #   - fork pull_request (no secret): skip the private scan with a warning. A
+        #     skipped check still reports success, so DO NOT merge a fork PR on green
+        #     alone — see CONTRIBUTING.md.
+        # Fail-CLOSED on a real grep error (exit >=2).
         env:
           LEAK_DENYLIST: ${{ secrets.LEAK_DENYLIST }}
+          EVENT_NAME: ${{ github.event_name }}
+          GIT_REF: ${{ github.ref }}
         run: |
           if [ -z "$LEAK_DENYLIST" ]; then
-            echo "::warning::LEAK_DENYLIST secret unavailable (fork PR?) — leak gate skipped"
+            if [ "$EVENT_NAME" = "push" ]; then
+              echo "::error::LEAK_DENYLIST secret missing on push to $GIT_REF — failing closed (misconfiguration)"
+              exit 1
+            fi
+            echo "::warning::LEAK_DENYLIST unavailable (fork PR) — private-denylist scan skipped; the fork-safe scan above still ran. DO NOT merge a fork PR on green alone (see CONTRIBUTING.md)."
             exit 0
           fi
           set +e
@@ -60,4 +86,4 @@ jobs:
           # git grep: 0 = match found, 1 = no match (good), >=2 = real error
           if [ "$rc" -ge 2 ]; then echo "::error::leak-gate git grep errored ($rc) — treating as leak"; exit 1; fi
           if [ "$rc" -eq 0 ]; then echo "$hits"; echo "::error::leak gate found forbidden strings"; exit 1; fi
-          echo "leak gate clean"
+          echo "leak gate (private denylist) clean"
