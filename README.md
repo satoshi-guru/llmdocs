@@ -169,6 +169,15 @@ cat ~/.llmdocs/MANIFEST.md         # see every library + page count
 `python -m scripts.store_index --check`. The `store/INDEX.md` committed in this repo is a small
 **example** built from `store/example/` — your live dashboard reflects your own store.
 
+### Store doctor
+
+`python scripts/store_doctor.py` audits the store for data-quality defects: binary
+**asset `.md`** files (PDF/PNG/ZIP/... the crawler decoded as text) and **INDEX
+drift** (link-rows vs files on disk). Read-only by default; `--prune-assets`
+deletes asset files (guarded), `--check` is a CI gate. INDEX drift is reported,
+not auto-fixed — re-fetch the slug with the current engine to regenerate a
+truthful INDEX.
+
 > Skills run from your project dir, so they locate the engine via **`$LLMDOCS_DIR`** (your clone),
 > set by `skills/install.sh`. The store path is **`$LLMDOCS_HOME`** (default `~/.llmdocs`); the
 > crawler User-Agent is **`$LLMDOCS_UA`**.
