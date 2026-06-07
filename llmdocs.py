@@ -310,6 +310,35 @@ def _file_key(url: str, out_dir: Path) -> str:
     return str(_url_to_path(url, out_dir))
 
 
+def _derive_scope(start_url: str, path_prefix_arg: str | None,
+                  max_depth_arg: int | None) -> tuple[str, int]:
+    """Return (path_prefix, max_depth) for a raw --url crawl.
+
+    - Directory URLs (/docs/, /reference/) -> first-segment silo, depth 4.
+    - File leaves (.../cryptsetup.8.html) are specific documents, not tree hubs:
+      scope to the file's PARENT directory and use a shallow depth (1 = page + its
+      immediate references). Without this, a leaf on a huge densely-cross-linked
+      reference site (man7.org) triggers a whole-domain crawl that times out and
+      writes nothing. Root-level files (/x.html) keep an empty prefix (whole site).
+    - Segments containing a dot, or an empty first segment -> empty prefix.
+    Explicit --path-prefix / --max-depth always win (incl. --max-depth 0)."""
+    start_path = urllib.parse.urlparse(start_url).path
+    is_file = bool(re.search(r"\.(html?|php|md|txt)$", start_path, re.IGNORECASE))
+    if path_prefix_arg is not None:
+        path_prefix = path_prefix_arg
+    elif is_file:
+        parent = start_path.rsplit("/", 1)[0]
+        path_prefix = f"{parent}/" if parent else ""
+    else:
+        first = start_path.lstrip("/").split("/", 1)[0]
+        path_prefix = "" if (not first or "." in first) else f"/{first}/"
+    if max_depth_arg is not None:
+        max_depth = max_depth_arg
+    else:
+        max_depth = 1 if is_file else 4
+    return path_prefix, max_depth
+
+
 def _path_matches_prefix(url: str, prefix: str) -> bool:
     """A page is *saved* only if its path is under path_prefix (empty prefix = all).
 
@@ -876,22 +905,11 @@ def main() -> int:
     elif args.url:
         parsed_start = urllib.parse.urlparse(args.url)
         domain = parsed_start.netloc
-        # Auto-derive path_prefix from the first path segment so the crawler
-        # stays inside /docs/, /reference/, /ruff/, etc. and doesn't bleed
-        # into /blog/, /customers/, /partners/ on shared-domain sites.
-        # User can override with --path-prefix or "" to disable.
-        if args.path_prefix is not None:
-            path_prefix = args.path_prefix
-        else:
-            # File-like start URLs (e.g. /docs.html) have no canonical sub-tree
-            # so we don't auto-restrict. Directory-like URLs get prefix = first segment.
-            start_path = parsed_start.path
-            is_file = bool(re.search(r"\.(html?|php|md|txt)$", start_path, re.IGNORECASE))
-            first_segment = start_path.lstrip("/").split("/", 1)[0]
-            if is_file or not first_segment or "." in first_segment:
-                path_prefix = ""
-            else:
-                path_prefix = f"/{first_segment}/"
+        # path_prefix scopes which pages are saved; max_depth bounds how far we crawl.
+        # See _derive_scope: directory URLs (/docs/) get a first-segment silo + depth 4;
+        # file leaves (.../cryptsetup.8.html) get a parent-dir silo + shallow depth 1.
+        path_prefix, derived_max_depth = _derive_scope(
+            args.url, args.path_prefix, args.max_depth)
 
         config = {
             "name": domain,
@@ -900,7 +918,7 @@ def main() -> int:
             "out": args.out or f"output/{domain}",
             "content_selectors": ["main", "article", "#content", "[class*='content']"],
             "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']"],
-            "max_depth": args.max_depth or 4,
+            "max_depth": derived_max_depth,
             "max_pages": args.max_pages or 5000,
             "same_domain_only": True,
             "path_prefix": path_prefix,

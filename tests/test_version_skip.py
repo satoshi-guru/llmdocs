@@ -81,3 +81,35 @@ def test_prefix_does_not_overmatch_sibling():
 
 def test_empty_prefix_matches_all():
     assert L._path_matches_prefix("https://zod.dev/anything", "")
+
+
+# --- _derive_scope: directory vs file-leaf crawl scoping ---------------------
+
+def test_derive_scope_directory_url():
+    assert L._derive_scope("https://reactnative.dev/docs/getting-started", None, None) == ("/docs/", 4)
+    assert L._derive_scope("https://www.nativewind.dev/docs", None, None) == ("/docs/", 4)
+
+
+def test_derive_scope_file_leaf_scopes_to_parent_and_shallow():
+    # man-page leaf -> parent dir silo + depth 1 (page + immediate refs), not a
+    # whole-domain crawl that times out
+    pfx, depth = L._derive_scope(
+        "https://man7.org/linux/man-pages/man8/cryptsetup.8.html", None, None)
+    assert pfx == "/linux/man-pages/man8/"
+    assert depth == 1
+
+
+def test_derive_scope_root_file_is_whole_site():
+    # a root-level file has no parent dir -> empty prefix (whole site), shallow depth
+    assert L._derive_scope("https://example.com/index.html", None, None) == ("", 1)
+
+
+def test_derive_scope_dotted_or_empty_segment_no_prefix():
+    assert L._derive_scope("https://zod.dev", None, None) == ("", 4)
+    assert L._derive_scope("https://x.io/v1.2.3", None, None)[0] == ""  # dotted first seg
+
+
+def test_derive_scope_explicit_args_win_including_depth_zero():
+    # --path-prefix and --max-depth override; max-depth 0 must NOT be coerced to default
+    assert L._derive_scope("https://man7.org/a/b/c.8.html", "/custom/", 0) == ("/custom/", 0)
+    assert L._derive_scope("https://reactnative.dev/docs/x", None, 7) == ("/docs/", 7)
