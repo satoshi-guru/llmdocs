@@ -48,13 +48,15 @@ def main() -> int:
         existing = [ln.rstrip() for ln in LOOKUP.read_text(encoding="utf-8").splitlines() if ln.strip()]
 
     # Keep every other library's lines; replace this lib's block with the new one.
-    kept = [ln for ln in existing if _lib_of(ln) != lib]
+    # Match case-INSENSITIVELY so re-merging `fastapi` as `FastApi` replaces (not duplicates)
+    # the block — the sort key already lowercases, so a case-sensitive filter left both (B4).
+    kept = [ln for ln in existing if _lib_of(ln).lower() != lib.lower()]
     merged = sorted(kept + new, key=lambda ln: (_lib_of(ln).lower(), ln))
 
     STORE.mkdir(parents=True, exist_ok=True)
     LOOKUP.write_text("\n".join(merged) + "\n", encoding="utf-8")
     print(f"LOOKUP.md: {len(new)} lines for '{lib}' merged ({len(merged)} total across "
-          f"{len({_lib_of(ln) for ln in merged})} libraries)")
+          f"{len({_lib_of(ln).lower() for ln in merged})} libraries)")
     return 0
 
 

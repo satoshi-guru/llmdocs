@@ -113,6 +113,17 @@ def test_lookup_merge_dedup_preserves_distinct_lines(tmp_path):
     assert lookup_text.count("x | f(a) | note1") == 1
 
 
+def test_lookup_merge_lib_match_is_case_insensitive(tmp_path):
+    """Re-merging a lib under different casing must REPLACE its block, not duplicate it (B4)."""
+    (tmp_path / "docs").mkdir()
+    _run_lookup_merge("fastapi", "fastapi | A() | seed\n", tmp_path)
+    _run_lookup_merge("FastApi", "FastApi | B() | recased\n", tmp_path)
+    text = (tmp_path / "docs" / "LOOKUP.md").read_text(encoding="utf-8")
+    assert "B()" in text and "A()" not in text          # old block dropped, not kept alongside
+    libs = {ln.split("|", 1)[0].strip().lower() for ln in text.splitlines() if ln.strip()}
+    assert libs == {"fastapi"}                            # one library, not two
+
+
 # ---------------------------------------------------------------------------
 # store_index — survives non-UTF-8 byte in COMPACT.md (scripts-F4)
 # ---------------------------------------------------------------------------
