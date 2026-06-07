@@ -257,6 +257,16 @@ DEFAULT_HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
+MAX_HTML_BYTES = 10 * 1024 * 1024  # cap on a single fetched/cached page body (gzip-bomb / OOM guard)
+
+
+def _is_text_content_type(ctype: str) -> bool:
+    """True for doc-like content types. An empty/missing type (server omitted it) is allowed."""
+    c = ctype.split(";")[0].strip().lower()
+    return (not c) or c.startswith("text/") or c.endswith("+xml") or c in {
+        "application/xml", "application/xhtml+xml", "application/json",
+    }
+
 
 # ---------------------------------------------------------------------------
 # Phase 1a: HTTP crawl + content extraction
@@ -460,7 +470,27 @@ def _fetch_and_extract(
         for _attempt in range(_MAX_ATTEMPTS):
             throttle.wait()
             try:
-                r = session.get(url, timeout=20, allow_redirects=True)
+                with session.get(url, timeout=20, allow_redirects=True, stream=True) as r:
+                    if r.status_code == 200:
+                        ctype = r.headers.get("Content-Type", "")
+                        if not _is_text_content_type(ctype):
+                            with log_lock:
+                                print(f"  skip-type  {url} ({ctype})")
+                            return None, [], {"url": url, "error": f"non-text content-type: {ctype}"}
+                        clen = r.headers.get("Content-Length", "")
+                        if clen.isdigit() and int(clen) > MAX_HTML_BYTES:
+                            with log_lock:
+                                print(f"  skip-size  {url} ({clen} bytes)")
+                            return None, [], {"url": url, "error": f"body too large: {clen} bytes"}
+                        # Cap the read so an unbounded (or gzip-bomb) body can't OOM the process.
+                        body = r.raw.read(MAX_HTML_BYTES + 1, decode_content=True)
+                        if len(body) > MAX_HTML_BYTES:
+                            with log_lock:
+                                print(f"  skip-size  {url} (>{MAX_HTML_BYTES} bytes)")
+                            return None, [], {"url": url, "error": "body exceeded size cap"}
+                        html = body.decode(r.encoding or "utf-8", errors="replace")
+                        break
+                    last_status = r.status_code
             except Exception as exc:
                 if _attempt < _MAX_ATTEMPTS - 1:
                     time.sleep(min(2 ** _attempt, 10))
@@ -468,10 +498,6 @@ def _fetch_and_extract(
                 with log_lock:
                     print(f"  ERROR  {url}: {exc}")
                 return None, [], {"url": url, "error": str(exc)}
-            if r.status_code == 200:
-                html = r.text
-                break
-            last_status = r.status_code
             if r.status_code in _RETRY_CODES and _attempt < _MAX_ATTEMPTS - 1:
                 try:
                     delay = float(r.headers.get("Retry-After", ""))

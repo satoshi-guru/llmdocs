@@ -278,7 +278,18 @@ def test_archive_existing_noop_when_empty(tmp_path):
 
 class _Resp:
     def __init__(self, code, text="", headers=None):
-        self.status_code = code; self.text = text; self.headers = headers or {}
+        self.status_code = code
+        self.text = text
+        self._body = text.encode("utf-8") if isinstance(text, str) else text
+        self.headers = headers or {}
+        self.encoding = "utf-8"
+        outer = self
+        class _Raw:
+            def read(self, n=None, decode_content=True):
+                return outer._body[:n] if n else outer._body
+        self.raw = _Raw()
+    def __enter__(self): return self
+    def __exit__(self, *a): return False
 
 
 def _fake_fetch(tmp_path, codes):
@@ -306,3 +317,45 @@ def test_fetch_retries_then_succeeds(tmp_path):
 def test_fetch_gives_up_after_max_attempts(tmp_path):
     (page, _links, err), n = _fake_fetch(tmp_path, [503, 503, 503])
     assert n == 3 and page is None and err == {"url": "https://x.io/p", "status": 503}
+
+
+# --- fetch hardening: body-size cap (A4/A-M3) + Content-Type allowlist (A-M4) ---
+
+def test_fetch_skips_oversized_body(tmp_path):
+    import threading
+    big = "<html><body><main>" + ("x" * (11 * 1024 * 1024)) + "</main></body></html>"
+    class _Sess:
+        def get(self, url, **k): return _Resp(200, big)
+    raw = tmp_path / "raw"; raw.mkdir(); out = tmp_path / "out"; out.mkdir()
+    cfg = {"content_selectors": ["main"], "skip_selectors": [], "max_depth": 0}
+    page, _l, err = L._fetch_and_extract("https://x.io/p", 0, _Sess(), raw, out, cfg,
+                                         L._FetchThrottle(0), threading.Lock())
+    assert page is None and err and "size" in err.get("error", "")
+    assert not any(raw.iterdir())   # oversized body NOT cached (A-M3)
+
+
+def test_fetch_skips_non_text_content_type(tmp_path):
+    import threading
+    good = "<html><body><main>" + ("w " * 120) + "</main></body></html>"
+    class _Sess:
+        def get(self, url, **k):
+            return _Resp(200, good, headers={"Content-Type": "application/octet-stream"})
+    raw = tmp_path / "raw"; raw.mkdir(); out = tmp_path / "out"; out.mkdir()
+    cfg = {"content_selectors": ["main"], "skip_selectors": [], "max_depth": 0}
+    page, _l, err = L._fetch_and_extract("https://x.io/p", 0, _Sess(), raw, out, cfg,
+                                         L._FetchThrottle(0), threading.Lock())
+    assert page is None and err and "content-type" in err.get("error", "").lower()
+
+
+def test_fetch_allows_normal_html(tmp_path):
+    import threading
+    good = "<html><body><main>" + ("word " * 120) + "</main></body></html>"
+    class _Sess:
+        def get(self, url, **k):
+            return _Resp(200, good, headers={"Content-Type": "text/html; charset=utf-8"})
+    raw = tmp_path / "raw"; raw.mkdir(); out = tmp_path / "out"; out.mkdir()
+    cfg = {"content_selectors": ["main"], "skip_selectors": [], "max_depth": 0}
+    page, _l, err = L._fetch_and_extract("https://x.io/p", 0, _Sess(), raw, out, cfg,
+                                         L._FetchThrottle(0), threading.Lock())
+    assert page is not None and err is None
+    assert any(raw.iterdir())       # within-cap body IS cached
