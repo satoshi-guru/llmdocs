@@ -39,11 +39,17 @@ jobs:
         run: python llmdocs.py --check store/example/alpha-lib/page.md
 
       - name: Leak gate (must find zero hits)
-        # .github is excluded: this very file contains the pattern as its definition.
+        # Uses `git grep` so ONLY tracked files are scanned — never the CI working
+        # tree, which holds generated artifacts (e.g. __pycache__/*.pyc embedding
+        # /home/runner paths) that would false-positive. .github is excluded: this
+        # workflow file defines the patterns. Fail-CLOSED: a grep tooling error
+        # (exit >=2) is treated as a leak, not a pass.
         run: |
-          if grep -rniE 'REDACTED_HOST|REDACTED_ORG|REDACTED_USER|/home/[a-z]+/|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|example-site|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|root@|ssh ' \
-               --exclude-dir=.git --exclude-dir=.github .; then
-            echo "::error::leak gate found forbidden strings"
-            exit 1
-          fi
+          set +e
+          hits=$(git grep -nIE 'REDACTED_HOST|REDACTED_ORG|REDACTED_USER|/home/[a-z]+/|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|REDACTED_PROJ|root@|ssh ' -- . ':!.github/*')
+          rc=$?
+          set -e
+          # git grep: 0 = match found, 1 = no match (good), >=2 = real error
+          if [ "$rc" -ge 2 ]; then echo "::error::leak-gate git grep errored ($rc) — treating as leak"; exit 1; fi
+          if [ "$rc" -eq 0 ]; then echo "$hits"; echo "::error::leak gate found forbidden strings"; exit 1; fi
           echo "leak gate clean"
