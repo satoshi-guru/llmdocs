@@ -21,13 +21,14 @@ for d in sorted(os.listdir(root)):
     txt = open(idx, encoding="utf-8", errors="replace").read()
     m = re.search(r"Source:\s*(\S+)", txt); src = m.group(1) if m else "?"
     m = re.search(r"Pages:\s*(\d+)", txt); hdr = int(m.group(1)) if m else -1
+    m = re.search(r"Engine:\s*(\S+)", txt); eng = m.group(1) if m else "-"
     disk = sum(1 for f in glob.glob(os.path.join(p, "**", "*.md"), recursive=True)
                if os.path.basename(f) not in ("INDEX.md", "COMPACT.md", "LOOKUP.md"))
     dt = datetime.date.fromtimestamp(os.path.getmtime(idx)).isoformat()
-    rows.append((disk, d, hdr, src, dt))
+    rows.append((disk, d, hdr, src, dt, eng))
 rows.sort()
-print(f"{'disk':>5} {'hdr':>5} {'dup?':>4}  {'date':10}  {'slug':24} url")
-for disk, d, hdr, src, dt in rows:
+print(f"{'disk':>5} {'hdr':>5} {'dup?':>4}  {'date':10}  {'engine':9} {'slug':24} url")
+for disk, d, hdr, src, dt, eng in rows:
     dup = "DUP" if hdr != disk and hdr >= 0 else ""
-    print(f"{disk:5d} {hdr:5d} {dup:>4}  {dt:10}  {d:24} {src}")
+    print(f"{disk:5d} {hdr:5d} {dup:>4}  {dt:10}  {eng:9} {d:24} {src}")
 print(f"\nTOTAL slugs={len(rows)}  disk_pages={sum(r[0] for r in rows)}")
