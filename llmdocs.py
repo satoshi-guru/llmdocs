@@ -80,9 +80,14 @@ DEFAULT_SKIP_URL_PATTERNS = [
     # Whitelists /en/ (canonical for readthedocs and many other doc sites).
     # Matches: /fr/, /de/, /pt_BR/, /zh_HANS-CN/, /de_DE/, etc.
     r"/(?!en[/?#]|en$)[a-z]{2}(_[A-Z]{2,4}(-[A-Z]{2,4})?)?(/|$)",
-    # Version-pinned paths: /2.43.0/, /v6.2/, /1.0/, /v0.1.5/
-    r"/v?\d+\.\d+(\.\d+)?(/|$)",
 ]
+
+# Version-pinned paths: /2.43.0/, /v6.2/, /1.0/, /v0.1.5/. These are normally
+# OLD duplicate doc trees we want to skip (keep only the unversioned/canonical
+# tree). The pattern is built in _build_skip_patterns so the ONE canonical
+# version can be exempted -- see _CONCRETE_VERSION_RE / canonical_version.
+_VERSION_PATH_RE = r"v?\d+\.\d+(\.\d+)?"
+_CONCRETE_VERSION_RE = re.compile(rf"^{_VERSION_PATH_RE}$")
 
 # Version aliases that often mirror each other. We pick ONE as canonical
 # (detected from the start URL) and skip the rest. Defaults to /stable/ if
@@ -99,11 +104,55 @@ def _detect_canonical_version_slug(start_url: str) -> str | None:
     return None
 
 
-def _build_skip_patterns(start_url: str) -> list[re.Pattern]:
-    """Compile skip patterns for a given crawl, excluding the canonical slug."""
+def _detect_concrete_version(start_url: str) -> str | None:
+    """Return the concrete version segment in the start URL (e.g. 'v1.18',
+    '0.77'), or None. Distinct from the alias slugs (latest/stable/...)."""
+    for seg in urllib.parse.urlparse(start_url).path.split("/"):
+        if seg and _CONCRETE_VERSION_RE.match(seg):
+            return seg
+    return None
+
+
+def _dominant_linked_version(html: str, base_url: str, threshold: float = 0.5) -> str | None:
+    """For an alias start page (e.g. /latest/) whose real content lives under a
+    concrete version, return that version (e.g. 'v1.18') if a single versioned
+    first-segment dominates the same-domain links. Returns None when there is no
+    clear winner, so callers can fall back safely."""
+    root = urllib.parse.urlparse(base_url).netloc
+    counts: dict[str, int] = {}
+    soup = BeautifulSoup(html, "lxml")
+    for a in soup.find_all("a", href=True):
+        full = urllib.parse.urljoin(base_url, str(a["href"]).strip())
+        p = urllib.parse.urlparse(full)
+        if p.netloc != root:
+            continue
+        first = p.path.lstrip("/").split("/", 1)[0]
+        if _CONCRETE_VERSION_RE.match(first):
+            counts[first] = counts.get(first, 0) + 1
+    if not counts:
+        return None
+    total = sum(counts.values())
+    top, n = max(counts.items(), key=lambda kv: kv[1])
+    return top if n / total >= threshold else None
+
+
+def _build_skip_patterns(start_url: str, canonical_version: str | None = None) -> list[re.Pattern]:
+    """Compile skip patterns for a given crawl.
+
+    Skips non-canonical version aliases (stable/latest/main/...) and version-pinned
+    paths, EXCEPT the one canonical version (so a site whose only real content lives
+    under /v1.18/ -- e.g. spec.matrix.org/latest/ aliasing to /v1.18/ -- is not skipped
+    into oblivion)."""
     canonical = _detect_canonical_version_slug(start_url)
     skip_aliases = [a for a in _VERSION_ALIASES if a != (canonical or "stable")]
     patterns = list(DEFAULT_SKIP_URL_PATTERNS)
+    if not canonical_version:
+        # No version pinned -> the canonical tree is unversioned (e.g. /docs/), so
+        # version-pinned paths (/docs/0.77/, /v6.2/) are OLD duplicate trees: skip them.
+        # When a version IS pinned the path_prefix already restricts saves to that
+        # tree and the bridge budget bounds wandering, so applying a generic
+        # version-skip here only drops legit nested pages (e.g. /v1.18/changelog/v1.1/).
+        patterns.append(rf"/{_VERSION_PATH_RE}(/|$)")
     if skip_aliases:
         patterns.append(rf"/({'|'.join(skip_aliases)})(/|$)")
     return [re.compile(p) for p in patterns]
@@ -416,6 +465,27 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     errors: list[dict] = []
     throttle = _FetchThrottle(rate_limit)
     log_lock = threading.Lock()
+
+    # --- Version canonicalization ---------------------------------------
+    # If the start URL pins a concrete version (/v1.18/, /0.77/) OR aliases one
+    # (/latest/, /stable/ whose page links predominantly to a numeric version),
+    # restrict the crawl to that version and exempt it from the version-skip.
+    # Without this, a site whose only real docs live under /v1.18/ (e.g.
+    # spec.matrix.org/latest/ -> /v1.18/) is skipped to a single page, because the
+    # generic version-skip drops its own canonical tree.
+    canonical_version = _detect_concrete_version(start_url)
+    if canonical_version is None and _detect_canonical_version_slug(start_url):
+        try:
+            throttle.wait()
+            r0 = session.get(start_url, timeout=20, allow_redirects=True)
+            if r0.status_code == 200:
+                canonical_version = _dominant_linked_version(r0.text, start_url)
+        except Exception:
+            canonical_version = None
+    if canonical_version:
+        config["path_prefix"] = f"/{canonical_version}/"
+        config["_skip_patterns"] = _build_skip_patterns(start_url, canonical_version)
+        print(f"          version-pinned crawl -> /{canonical_version}/ (canonical tree)")
 
     prefix_str = config.get("path_prefix") or "(none)"
     print(f"\n[Phase 1] HTTP crawl — {start_url}")
