@@ -212,3 +212,37 @@ def test_archive_existing_moves_old_copy(tmp_path):
 def test_archive_existing_noop_when_empty(tmp_path):
     store = tmp_path / "docs"; slug = store / "lib"; slug.mkdir(parents=True)
     assert L._archive_existing(slug) is None  # nothing to archive
+
+
+# --- HTTP retry/backoff (#31) -------------------------------------------------
+
+class _Resp:
+    def __init__(self, code, text="", headers=None):
+        self.status_code = code; self.text = text; self.headers = headers or {}
+
+
+def _fake_fetch(tmp_path, codes):
+    """Run _fetch_and_extract with a session yielding the given status codes in order."""
+    import threading
+    good_html = "<html><body><main>" + ("word " * 120) + "</main></body></html>"
+    seq = list(codes); calls = {"n": 0}
+    class _Sess:
+        def get(self, url, **k):
+            i = calls["n"]; calls["n"] += 1
+            code = seq[i]
+            return _Resp(200, good_html) if code == 200 else _Resp(code, headers={"Retry-After": "0"})
+    raw = tmp_path / "raw"; raw.mkdir(); out = tmp_path / "out"; out.mkdir()
+    cfg = {"content_selectors": ["main"], "skip_selectors": [], "max_depth": 0}
+    res = L._fetch_and_extract("https://x.io/p", 0, _Sess(), raw, out, cfg,
+                               L._FetchThrottle(0), threading.Lock())
+    return res, calls["n"]
+
+
+def test_fetch_retries_then_succeeds(tmp_path):
+    (page, _links, err), n = _fake_fetch(tmp_path, [429, 200])
+    assert n == 2 and page is not None and err is None
+
+
+def test_fetch_gives_up_after_max_attempts(tmp_path):
+    (page, _links, err), n = _fake_fetch(tmp_path, [503, 503, 503])
+    assert n == 3 and page is None and err == {"url": "https://x.io/p", "status": 503}

@@ -449,21 +449,44 @@ def _fetch_and_extract(
         with log_lock:
             print(f"  cache  {url}")
     else:
-        throttle.wait()
-        try:
-            r = session.get(url, timeout=20, allow_redirects=True)
-            if r.status_code != 200:
+        # Retry transient throttling/5xx with exponential backoff (honor Retry-After)
+        # so rate-limited sites (e.g. MediaWiki under load) don't silently drop pages.
+        _RETRY_CODES = {429, 500, 502, 503, 504}
+        _MAX_ATTEMPTS = 3
+        html = None
+        last_status = None
+        for _attempt in range(_MAX_ATTEMPTS):
+            throttle.wait()
+            try:
+                r = session.get(url, timeout=20, allow_redirects=True)
+            except Exception as exc:
+                if _attempt < _MAX_ATTEMPTS - 1:
+                    time.sleep(min(2 ** _attempt, 10))
+                    continue
                 with log_lock:
-                    print(f"  skip-{r.status_code}  {url}")
-                return None, [], {"url": url, "status": r.status_code}
-            html = r.text
-            cache_file.write_text(html, encoding="utf-8")
+                    print(f"  ERROR  {url}: {exc}")
+                return None, [], {"url": url, "error": str(exc)}
+            if r.status_code == 200:
+                html = r.text
+                break
+            last_status = r.status_code
+            if r.status_code in _RETRY_CODES and _attempt < _MAX_ATTEMPTS - 1:
+                try:
+                    delay = float(r.headers.get("Retry-After", ""))
+                except (TypeError, ValueError):
+                    delay = 2 ** _attempt
+                with log_lock:
+                    print(f"  retry-{r.status_code}  {url} (in {min(delay, 30):.0f}s)")
+                time.sleep(min(delay, 30))
+                continue
+            break
+        if html is None:
             with log_lock:
-                print(f"  fetch  {url}  ({len(html):,} bytes)")
-        except Exception as exc:
-            with log_lock:
-                print(f"  ERROR  {url}: {exc}")
-            return None, [], {"url": url, "error": str(exc)}
+                print(f"  skip-{last_status}  {url}")
+            return None, [], {"url": url, "status": last_status}
+        cache_file.write_text(html, encoding="utf-8")
+        with log_lock:
+            print(f"  fetch  {url}  ({len(html):,} bytes)")
 
     soup = BeautifulSoup(html, "lxml")
 
