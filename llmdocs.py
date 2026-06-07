@@ -593,7 +593,7 @@ def phase1_http(config: dict, out_dir: Path) -> tuple[list[dict], list[dict]]:
                 if page is not None and _path_matches_prefix(page["url"], prefix):
                     fk = _file_key(page["url"], out_dir)
                     if fk not in pages:
-                        _write_page(page, out_dir, minify)  # write now: survive interrupt
+                        _write_page(page, out_dir, minify, config.get("_provenance"))  # write now: survive interrupt
                     pages[fk] = page
                 if err is not None:
                     errors.append(err)
@@ -720,19 +720,40 @@ def phase3_sort(pages: dict) -> list[tuple[str, dict]]:
 # Phase 4: Write LLM-ready markdown files
 # ---------------------------------------------------------------------------
 
-def _write_page(data: dict, out_dir: Path, minify=None) -> dict:
+def _engine_version() -> str:
+    """Short identifier of the engine that produced a fetch, for provenance:
+    a VERSION file if present, else the engine repo's short git sha, else 'unknown'."""
+    here = Path(__file__).resolve().parent
+    vf = here / "VERSION"
+    if vf.is_file():
+        return vf.read_text(encoding="utf-8").strip()[:40] or "unknown"
+    try:
+        r = subprocess.run(["git", "-C", str(here), "rev-parse", "--short", "HEAD"],
+                           capture_output=True, text=True, timeout=5)
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _write_page(data: dict, out_dir: Path, minify=None, provenance: dict | None = None) -> dict:
     """Write one page (frontmatter + optional min-compaction) to its output file and
     return its INDEX entry. Shared by the incremental HTTP crawl (#14) and the github
     strategy. `data["url"]` is the real source URL (the pages dict is keyed by the
-    output-file for dedup — never use the key as the url)."""
+    output-file for dedup — never use the key as the url). `provenance` (engine sha +
+    fetched_at) is stamped into the frontmatter so every page records what made it."""
     url = data["url"]
     fp: Path = data["filepath"]
     fp.parent.mkdir(parents=True, exist_ok=True)
     md = data["markdown"]
+    prov = ""
+    if provenance:
+        prov = f'fetched_with: {provenance.get("engine", "unknown")}\nfetched_at: {provenance.get("fetched_at", "")}\n'
     if md.startswith("---"):              # source already had frontmatter
         content = md
     else:
-        content = (f'---\ntitle: "{data["title"]}"\nurl: {url}\n---\n\n'
+        content = (f'---\ntitle: "{data["title"]}"\nurl: {url}\n{prov}---\n\n'
                    f'# {data["title"]}\n\n{md}')
     if minify:
         content = minify(content)
@@ -741,7 +762,7 @@ def _write_page(data: dict, out_dir: Path, minify=None) -> dict:
 
 
 def phase4_write(sorted_pages: list[tuple[str, dict]], out_dir: Path,
-                 compact_pages: bool = True) -> list[dict]:
+                 compact_pages: bool = True, provenance: dict | None = None) -> list[dict]:
     print(f"\n[Phase 4] Writing {len(sorted_pages)} files"
           f"{' (deterministic min compaction)' if compact_pages else ' (raw)'}...")
     minify = None
@@ -750,7 +771,7 @@ def phase4_write(sorted_pages: list[tuple[str, dict]], out_dir: Path,
         minify = _compact.minify
     index_entries = []
     for _file_key_unused, data in sorted_pages:
-        entry = _write_page(data, out_dir, minify)
+        entry = _write_page(data, out_dir, minify, provenance)
         index_entries.append(entry)
         print(f"  write  {entry['file']}")
     return index_entries
@@ -764,9 +785,13 @@ def _write_index(entries: list[dict], out_dir: Path, config: dict) -> None:
         sections.setdefault(section, []).append(e)
 
     source = config.get("url") or config.get("github_repo", "?")
+    prov = config.get("_provenance") or {}
+    prov_line = ""
+    if prov:
+        prov_line = f"Engine: {prov.get('engine', 'unknown')}  \nFetched: {prov.get('fetched_at', '')}  \n"
     lines = [
         f"# {config.get('name', 'Docs')} — LLM Index",
-        f"\nSource: {source}  \nPages: {len(entries)}\n\n---\n",
+        f"\nSource: {source}  \nPages: {len(entries)}  \n{prov_line}\n---\n",
     ]
     for section, sec_entries in sorted(sections.items()):
         lines.append(f"\n## {section.replace('-', ' ').replace('_', ' ').title()}\n")
@@ -785,6 +810,8 @@ def run(config: dict) -> int:
     out_dir = Path(config["out"])
     out_dir.mkdir(parents=True, exist_ok=True)
     strategy = config.get("strategy", "http")
+    config["_provenance"] = {"engine": _engine_version(),
+                             "fetched_at": time.strftime("%Y-%m-%d")}
 
     print(f"\n{'='*60}")
     print(f"  llmdocs — {config.get('name', config.get('url', '?'))}")
@@ -798,7 +825,7 @@ def run(config: dict) -> int:
             print("\n[FATAL] No pages extracted.")
             return 1
         sorted_pages = phase3_sort(pages)
-        index_entries = phase4_write(sorted_pages, out_dir, config.get("compact_pages", True))
+        index_entries = phase4_write(sorted_pages, out_dir, config.get("compact_pages", True), config["_provenance"])
         _write_index(index_entries, out_dir, config)
     else:
         # HTTP crawl writes each page + the INDEX itself (incremental, interrupt-safe).
