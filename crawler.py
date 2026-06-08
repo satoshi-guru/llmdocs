@@ -925,6 +925,27 @@ def phase1_llms_txt(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
     return pages, errors
 
 
+def _detect_strategy(url: str) -> str:
+    """Auto-pick an acquisition strategy for a raw --url (no --strategy/--preset given).
+
+    Probes `<base>/llms.txt`: if it returns a markdown link index, use `llms-txt`;
+    otherwise fall back to the HTML crawl. `github` is never auto-picked — it needs an
+    explicit repo. Any probe failure falls back to `http`, so auto-detect can only
+    upgrade a fetch, never break one."""
+    base = url.rstrip("/")
+    llms_url = base if base.endswith("llms.txt") else f"{base}/llms.txt"
+    try:
+        r = requests.get(llms_url, headers=DEFAULT_HEADERS, timeout=15)
+    except Exception:
+        return "http"
+    if r.status_code != 200 or "html" in r.headers.get("Content-Type", "").lower():
+        return "http"
+    if re.search(r"\[[^\]]*\]\(https?://", r.text):
+        print(f"  [auto-detect] {llms_url} → strategy: llms-txt")
+        return "llms-txt"
+    return "http"
+
+
 # ---------------------------------------------------------------------------
 # Phase 3: Sort
 # ---------------------------------------------------------------------------
@@ -1139,10 +1160,12 @@ def main() -> int:
     parser.add_argument("--preset", choices=list(PRESETS.keys()), help="Use a named preset config")
     parser.add_argument("--url", help="Root URL to scrape (HTTP strategy)")
     parser.add_argument("--out", help="Output directory (overrides preset default)")
-    parser.add_argument("--strategy", choices=["http", "github", "llms-txt"], default="http",
-                        help="Fetch strategy when using --url (default: http). "
-                             "llms-txt: enumerate via <base>/llms.txt + adaptive per-page "
-                             "fetch (raw .md -> .md twin probe -> HTML scrape).")
+    parser.add_argument("--strategy", choices=["http", "github", "llms-txt"], default=None,
+                        help="Fetch strategy for --url. Default: AUTO-DETECT — probe "
+                             "<base>/llms.txt → llms-txt, else http. "
+                             "llms-txt: enumerate via llms.txt + adaptive per-page fetch "
+                             "(raw .md → .md twin probe → HTML scrape). "
+                             "github needs --github-repo.")
     parser.add_argument("--github-repo", help="GitHub repo URL (strategy=github)")
     parser.add_argument("--github-docs-dir", default="docs",
                         help="Subdirectory in repo containing docs (default: docs)")
@@ -1259,9 +1282,19 @@ def main() -> int:
         path_prefix, derived_max_depth = _derive_scope(
             args.url, args.path_prefix, args.max_depth)
 
+        # Resolve the strategy: explicit --strategy wins; otherwise auto-detect.
+        # github is only inferred from an explicit --github-repo (never from a URL);
+        # everything else probes llms.txt and falls back to http.
+        if args.strategy:
+            strategy = args.strategy
+        elif args.github_repo:
+            strategy = "github"
+        else:
+            strategy = _detect_strategy(args.url)
+
         config = {
             "name": domain,
-            "strategy": args.strategy,
+            "strategy": strategy,
             "url": args.url,
             "out": args.out or f"output/{domain}",
             "content_selectors": ["main", "article", "#content", "[class*='content']"],
@@ -1273,7 +1306,7 @@ def main() -> int:
             "rate_limit": args.rate_limit if args.rate_limit is not None else 0.5,
             "workers": args.workers,
         }
-        if args.strategy == "github":
+        if strategy == "github":
             if not args.github_repo:
                 parser.error("--github-repo is required when --strategy github")
             config["github_repo"] = args.github_repo

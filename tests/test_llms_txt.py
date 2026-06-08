@@ -107,3 +107,40 @@ def test_write_page_still_adds_heading_when_body_has_none(tmp_path):
             "markdown": "Connect your wallet.", "filepath": fp, "depth": 0}
     L._write_page(page, out, minify=None)
     assert "# Login\n" in fp.read_text()
+
+
+# --- _detect_strategy: auto-detection (network-free via monkeypatch) ---------
+
+def _patch_get(monkeypatch, resp=None, exc=None):
+    def fake_get(url, **kwargs):
+        if exc is not None:
+            raise exc
+        return resp
+    monkeypatch.setattr(L.requests, "get", fake_get)
+
+
+def test_detect_strategy_llms_txt_when_index_present(monkeypatch):
+    _patch_get(monkeypatch, _Resp(ctype="text/plain",
+               text="# Site\n\n- [Page](https://docs.x.com/a.md)\n"))
+    assert L._detect_strategy("https://docs.x.com") == "llms-txt"
+
+
+def test_detect_strategy_http_on_404(monkeypatch):
+    _patch_get(monkeypatch, _Resp(status=404, ctype="text/html", text="nope"))
+    assert L._detect_strategy("https://docs.x.com") == "http"
+
+
+def test_detect_strategy_http_when_llms_txt_is_html(monkeypatch):
+    # 200 but an HTML soft-404 page, not a real llms.txt
+    _patch_get(monkeypatch, _Resp(ctype="text/html", text="<html>[x](http://y)</html>"))
+    assert L._detect_strategy("https://docs.x.com") == "http"
+
+
+def test_detect_strategy_http_when_no_markdown_links(monkeypatch):
+    _patch_get(monkeypatch, _Resp(ctype="text/plain", text="just prose, no links here"))
+    assert L._detect_strategy("https://docs.x.com") == "http"
+
+
+def test_detect_strategy_http_on_network_error(monkeypatch):
+    _patch_get(monkeypatch, exc=RuntimeError("dns fail"))
+    assert L._detect_strategy("https://docs.x.com") == "http"
