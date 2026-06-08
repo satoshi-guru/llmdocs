@@ -785,6 +785,147 @@ def phase1_github(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
 
 
 # ---------------------------------------------------------------------------
+# Phase 1c: llms.txt index (machine-readable doc surface)
+# ---------------------------------------------------------------------------
+
+def _fetch_raw_md(url: str, session: requests.Session, throttle: "_FetchThrottle",
+                  log_lock: threading.Lock, out_dir: Path, title_hint: str,
+                  src_url: str | None = None) -> tuple[dict | None, dict | None]:
+    """Fetch a raw-markdown twin. Appends ?displayAgentInstructions=false — GitBook
+    uses it to strip the injected "you are an agent…" preamble; other sites ignore
+    the unknown query param, so it is always safe to send. Returns (page|None,
+    error|None). `page["url"]` is the human URL: `src_url` when probing the `.md`
+    twin of an HTML page, else `url`. Rejects HTML served with a 200 (soft-404)."""
+    sep = "&" if "?" in url else "?"
+    fetch_url = f"{url}{sep}displayAgentInstructions=false"
+    try:
+        throttle.wait()
+        r = session.get(fetch_url, timeout=20, allow_redirects=True)
+    except Exception as exc:
+        with log_lock:
+            print(f"  ERROR  {url}: {exc}")
+        return None, {"url": url, "error": str(exc)}
+    if r.status_code != 200:
+        with log_lock:
+            print(f"  miss-{r.status_code}  {url}")
+        return None, {"url": url, "status": r.status_code}
+    ctype = r.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    body = r.text
+    if "html" in ctype or body.lstrip()[:1] == "<":   # soft-404 / HTML, not markdown
+        with log_lock:
+            print(f"  not-md  {url} ({ctype or 'no-ctype'})")
+        return None, {"url": url, "error": f"not markdown ({ctype or 'no-ctype'})"}
+    if len(body.strip()) < 40:
+        return None, {"url": url, "error": "empty markdown"}
+    human_url = src_url or url
+    m = re.search(r"^#{1,6}\s+(.+)", body, re.MULTILINE)
+    title = (m.group(1).strip() if m
+             else (title_hint
+                   or urllib.parse.urlparse(human_url).path.rstrip("/").rsplit("/", 1)[-1]
+                   or "Untitled"))
+    with log_lock:
+        print(f"  md     {url}  ({len(body):,} bytes)")
+    return {
+        "url": human_url,
+        "title": title,
+        "markdown": body,
+        "filepath": _url_to_path(human_url, out_dir),
+        "depth": max(0, human_url.count("/") - 3),
+    }, None
+
+
+def phase1_llms_txt(config: dict, out_dir: Path) -> tuple[dict, list[dict]]:
+    """Acquire docs via the site's `llms.txt` index.
+
+    `llms.txt` is a markdown index of doc pages. It comes in two flavors observed in
+    the wild, so it is treated as the authoritative URL list with an ADAPTIVE fetch
+    per page:
+      - links point at `.md` twins  (asterdex, claude)  -> raw markdown fetch
+      - links point at HTML pages   (printingpress)     -> probe `<url>.md`, else
+        fall back to the HTML extractor (`_fetch_and_extract`).
+    Returns (pages, errors) in the same shape as `phase1_github`, so the caller
+    reuses `phase3_sort` + `phase4_write`.
+    """
+    base = config["url"].rstrip("/")
+    llms_url = base if base.endswith("llms.txt") else f"{base}/llms.txt"
+    root_host = urllib.parse.urlparse(llms_url).netloc
+
+    session = requests.Session()
+    session.headers.update(DEFAULT_HEADERS)
+    rate_limit = config.get("rate_limit", 0.5)
+    workers = max(1, int(config.get("workers", 1)))
+    max_pages = config.get("max_pages", 5000)
+    throttle = _FetchThrottle(rate_limit)
+    log_lock = threading.Lock()
+    raw_dir = out_dir / "_raw_html"          # used only by the HTML fallback path
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    config["_skip_patterns"] = _build_skip_patterns(base)
+
+    print(f"\n[Phase 1] llms.txt index — {llms_url}")
+    try:
+        throttle.wait()
+        r = session.get(llms_url, timeout=20)
+    except Exception as exc:
+        return {}, [{"url": llms_url, "error": str(exc)}]
+    if r.status_code != 200:
+        return {}, [{"url": llms_url, "status": r.status_code,
+                     "error": "llms.txt not found — try --strategy http"}]
+    index_text = r.text
+
+    # Parse markdown links [text](url); same-host http(s) only; dedupe by output file.
+    link_re = re.compile(r"\[([^\]]*)\]\((https?://[^\s)]+)\)")
+    seen_files: set[str] = set()
+    targets: list[tuple[str, str]] = []
+    for m in link_re.finditer(index_text):
+        title_hint = m.group(1).strip()
+        url = urllib.parse.urlparse(m.group(2).strip())._replace(fragment="").geturl()
+        p = urllib.parse.urlparse(url)
+        if p.netloc != root_host or _ASSET_EXT_RE.search(p.path):
+            continue
+        fk = _file_key(url, out_dir)
+        if fk in seen_files:
+            continue
+        seen_files.add(fk)
+        targets.append((title_hint, url))
+
+    print(f"          {len(targets)} unique same-host pages listed (host={root_host})")
+    if not targets:
+        return {}, [{"url": llms_url, "error": "no same-host links parsed from llms.txt"}]
+    if len(targets) > max_pages:
+        print(f"          capping at max_pages={max_pages} (dropping {len(targets) - max_pages})")
+        targets = targets[:max_pages]
+
+    def _fetch_one(title_hint: str, url: str) -> tuple[dict | None, dict | None]:
+        if url.lower().endswith(".md"):
+            page, _err = _fetch_raw_md(url, session, throttle, log_lock, out_dir, title_hint)
+            if page is not None:
+                return page, None
+        else:
+            page, _err = _fetch_raw_md(url + ".md", session, throttle, log_lock,
+                                       out_dir, title_hint, src_url=url)
+            if page is not None:
+                return page, None
+        # Adaptive fallback: HTML-scrape the human page via the existing extractor.
+        page, _links, err = _fetch_and_extract(
+            url, 0, session, raw_dir, out_dir, config, throttle, log_lock)
+        return page, err
+
+    pages: dict[str, dict] = {}
+    errors: list[dict] = []
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = [ex.submit(_fetch_one, t, u) for t, u in targets]
+        for fut in as_completed(futs):
+            page, err = fut.result()
+            if page is not None:
+                pages.setdefault(_file_key(page["url"], out_dir), page)
+            elif err is not None:
+                errors.append(err)
+
+    print(f"[Phase 1] Done — {len(pages)} pages fetched, {len(errors)} errors")
+    return pages, errors
+
+
+# ---------------------------------------------------------------------------
 # Phase 3: Sort
 # ---------------------------------------------------------------------------
 
@@ -837,9 +978,14 @@ def _write_page(data: dict, out_dir: Path, minify=None, provenance: dict | None 
         # embedded `"`/newlines, so an attacker-influenced title (page <title> or
         # a GitHub heading) can't forge extra frontmatter keys. url too.
         title_yaml = json.dumps(data["title"])
-        heading = data["title"].replace("\n", " ").strip()
-        content = (f'---\ntitle: {title_yaml}\nurl: {json.dumps(url)}\n{prov}---\n\n'
-                   f'# {heading}\n\n{md}')
+        front = f'---\ntitle: {title_yaml}\nurl: {json.dumps(url)}\n{prov}---\n\n'
+        if md.lstrip().startswith("# "):
+            # Body already opens with its own H1 (raw .md twins, many GitHub docs) —
+            # don't prepend a duplicate title heading.
+            content = front + md.lstrip()
+        else:
+            heading = data["title"].replace("\n", " ").strip()
+            content = front + f'# {heading}\n\n{md}'
     if minify:
         content = minify(content)
     fp.write_text(content, encoding="utf-8")
@@ -939,10 +1085,16 @@ def run(config: dict) -> int:
     print(f"  output   : {out_dir.resolve()}")
     print(f"{'='*60}")
 
-    if strategy == "github":
-        pages, errors = phase1_github(config, out_dir)
+    if strategy in ("github", "llms-txt"):
+        # Both build a {file_key: page} dict, then share sort/write/index.
+        if strategy == "llms-txt":
+            pages, errors = phase1_llms_txt(config, out_dir)
+        else:
+            pages, errors = phase1_github(config, out_dir)
         if not pages:
             print("\n[FATAL] No pages extracted.")
+            if strategy == "llms-txt":
+                print("  Tip: site may have no llms.txt. Use --strategy http (HTML crawl).")
             return 1
         sorted_pages = phase3_sort(pages)
         index_entries = phase4_write(sorted_pages, out_dir, config.get("compact_pages", True), config["_provenance"])
@@ -987,8 +1139,10 @@ def main() -> int:
     parser.add_argument("--preset", choices=list(PRESETS.keys()), help="Use a named preset config")
     parser.add_argument("--url", help="Root URL to scrape (HTTP strategy)")
     parser.add_argument("--out", help="Output directory (overrides preset default)")
-    parser.add_argument("--strategy", choices=["http", "github"], default="http",
-                        help="Fetch strategy when using --url (default: http)")
+    parser.add_argument("--strategy", choices=["http", "github", "llms-txt"], default="http",
+                        help="Fetch strategy when using --url (default: http). "
+                             "llms-txt: enumerate via <base>/llms.txt + adaptive per-page "
+                             "fetch (raw .md -> .md twin probe -> HTML scrape).")
     parser.add_argument("--github-repo", help="GitHub repo URL (strategy=github)")
     parser.add_argument("--github-docs-dir", default="docs",
                         help="Subdirectory in repo containing docs (default: docs)")
