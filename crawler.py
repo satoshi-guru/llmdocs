@@ -507,7 +507,13 @@ def _fetch_and_extract(
                             with log_lock:
                                 print(f"  skip-size  {url} (>{MAX_HTML_BYTES} bytes)")
                             return None, [], {"url": url, "error": "body exceeded size cap"}
-                        html = body.decode(r.encoding or "utf-8", errors="replace")
+                        # requests reports ISO-8859-1 when a text/* response omits
+                        # charset (HTTP default); modern docs sites are UTF-8, so
+                        # trust the header only when it names a real charset.
+                        enc = r.encoding
+                        if not enc or enc.lower() == "iso-8859-1":
+                            enc = r.apparent_encoding or "utf-8"
+                        html = body.decode(enc, errors="replace")
                         break
                     last_status = r.status_code
             except Exception as exc:
