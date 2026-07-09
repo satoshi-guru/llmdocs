@@ -244,6 +244,25 @@ PRESETS: dict[str, dict] = {
         "same_domain_only": True,
         "rate_limit": 0.5,
     },
+    # Suno Help Center — Front knowledge base (server-rendered HTML). Needs tuned
+    # selectors: the generic `[class*='content']` matches a 15-char header button
+    # (`.kb-button-content`) on every page, so a plain --url crawl extracts <80 chars
+    # at the root and saves 0 pages. Front KBs keep article bodies in
+    # `.article-content` and listing pages in `.page-content`.
+    "suno": {
+        "name": "Suno Help Center",
+        "strategy": "http",
+        "url": "https://help.suno.com/en/",
+        "out": "output/suno",
+        "content_selectors": [".article-content", ".page-content", "article", "main"],
+        "skip_selectors": ["nav", "footer", "header", "[class*='cookie']",
+                           "[class*='breadcrumb']", "[class*='search']"],
+        "path_prefix": "/en",
+        "max_depth": 4,
+        "max_pages": 300,
+        "same_domain_only": True,
+        "rate_limit": 0.5,
+    },
 }
 
 DEFAULT_HEADERS = {
@@ -488,7 +507,13 @@ def _fetch_and_extract(
                             with log_lock:
                                 print(f"  skip-size  {url} (>{MAX_HTML_BYTES} bytes)")
                             return None, [], {"url": url, "error": "body exceeded size cap"}
-                        html = body.decode(r.encoding or "utf-8", errors="replace")
+                        # requests reports ISO-8859-1 when a text/* response omits
+                        # charset (HTTP default); modern docs sites are UTF-8, so
+                        # trust the header only when it names a real charset.
+                        enc = r.encoding
+                        if not enc or enc.lower() == "iso-8859-1":
+                            enc = r.apparent_encoding or "utf-8"
+                        html = body.decode(enc, errors="replace")
                         break
                     last_status = r.status_code
             except Exception as exc:
