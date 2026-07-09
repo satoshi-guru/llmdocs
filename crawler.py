@@ -244,6 +244,25 @@ PRESETS: dict[str, dict] = {
         "same_domain_only": True,
         "rate_limit": 0.5,
     },
+    # Suno Help Center — Front knowledge base (server-rendered HTML). Needs tuned
+    # selectors: the generic `[class*='content']` matches a 15-char header button
+    # (`.kb-button-content`) on every page, so a plain --url crawl extracts <80 chars
+    # at the root and saves 0 pages. Front KBs keep article bodies in
+    # `.article-content` and listing pages in `.page-content`.
+    "suno": {
+        "name": "Suno Help Center",
+        "strategy": "http",
+        "url": "https://help.suno.com/en/",
+        "out": "output/suno",
+        "content_selectors": [".article-content", ".page-content", "article", "main"],
+        "skip_selectors": ["nav", "footer", "header", "[class*='cookie']",
+                           "[class*='breadcrumb']", "[class*='search']"],
+        "path_prefix": "/en",
+        "max_depth": 4,
+        "max_pages": 300,
+        "same_domain_only": True,
+        "rate_limit": 0.5,
+    },
 }
 
 DEFAULT_HEADERS = {
