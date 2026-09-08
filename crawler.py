@@ -1322,7 +1322,7 @@ def main() -> int:
             "strategy": strategy,
             "url": args.url,
             "out": args.out or f"output/{domain}",
-            "content_selectors": ["main", "article", "#content", "[class*='content']"],
+            "content_selectors": ["main", "article", "#content", "#mainContent", "[class*='content']"],
             "skip_selectors": ["nav", "footer", "header", "aside", "[class*='sidebar']"],
             "max_depth": derived_max_depth,
             "max_pages": args.max_pages or 5000,
